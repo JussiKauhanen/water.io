@@ -21,6 +21,9 @@ body{
 
 /* ---- layout ---- */
 .stage{position:relative;z-index:1;height:100%}
+@media (max-width:759px){
+  body{background:#fff}
+}
 .phone{display:none}
 .screen{position:relative;height:100%;display:flex;flex-direction:column;background:#fff;overflow:hidden}
 .desktop-qr{display:none}
