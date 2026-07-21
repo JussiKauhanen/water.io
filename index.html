@@ -225,15 +225,21 @@
       <div class="post-loc-wrap">
         <input id="pPlace" maxlength="80" placeholder="e.g. Kaitalampi, Espoo">
         <button type="button" id="geoDetect" class="geo-btn" title="Detect my location">
-          <svg viewBox="0 0 20 20" fill="none" width="15" height="15">
-            <circle cx="10" cy="10" r="3.5" stroke="currentColor" stroke-width="1.5"/>
-            <path d="M10 1.5v3M10 15.5v3M1.5 10h3M15.5 10h3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          <!-- Compass: red north needle, grey south, circle -->
+          <svg viewBox="0 0 20 20" width="30" height="30" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="10" cy="10" r="8.5" fill="none" stroke="#8b939d" stroke-width="1.5"/>
+            <polygon points="10,2.5 13,10 7,10" fill="#e63946"/>
+            <polygon points="10,17.5 13,10 7,10" fill="#8b939d" opacity="0.45"/>
+            <circle cx="10" cy="10" r="2.2" fill="#ffffff" stroke="#8b939d" stroke-width="1.2"/>
           </svg>
         </button>
         <button type="button" id="mapPick" class="geo-btn" title="Pick on map">
-          <svg viewBox="0 0 20 20" fill="none" width="15" height="15">
-            <path d="M10 1.5A5.5 5.5 0 004.5 7C4.5 11 10 18.5 10 18.5S15.5 11 15.5 7A5.5 5.5 0 0010 1.5z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
-            <circle cx="10" cy="7" r="2" stroke="currentColor" stroke-width="1.5"/>
+          <!-- Simplified maps icon: green map + yellow road + red pin, no G -->
+          <svg viewBox="0 0 16 16" fill="none" width="35" height="35" xmlns="http://www.w3.org/2000/svg">
+            <rect x="1" y="5.5" width="10.5" height="9.5" rx="1.5" fill="#4CAF50"/>
+            <path d="M1 12.5L11.5 6v2.5L1 15z" fill="#FFC107"/>
+            <path d="M11.5 0C9.57 0 8 1.57 8 3.5 8 6.08 11.5 10 11.5 10S15 6.08 15 3.5C15 1.57 13.43 0 11.5 0z" fill="#e63946"/>
+            <circle cx="11.5" cy="3.5" r="1.3" fill="#b71c1c"/>
           </svg>
         </button>
       </div>

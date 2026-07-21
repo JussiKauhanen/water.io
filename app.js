@@ -458,12 +458,12 @@ function shrink(file, max = 900) {
 /* ---------- render ---------- */
 function render() {
   initializeDB();
-  
+
   const feed = $('#feed');
   if (!feed) return;
-  
+
   feed.innerHTML = '';
-  
+
   if (!db.posts || db.posts.length === 0) {
     const empty = el('div', 'empty-state');
     empty.innerHTML = `
@@ -500,7 +500,7 @@ function render() {
 
 function card(p) {
   if (!p) return el('div');
-  
+
   const c = el('div', 'card');
 
   const head = el('div', 'card-head');
@@ -980,7 +980,7 @@ function doPost() {
   showToast('Spot added!');
 }
 
-const GEO_DETECT_SVG = '<svg viewBox="0 0 20 20" fill="none" width="15" height="15"><circle cx="10" cy="10" r="3.5" stroke="currentColor" stroke-width="1.5"/><path d="M10 1.5v3M10 15.5v3M1.5 10h3M15.5 10h3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>';
+const GEO_DETECT_SVG = '<svg viewBox="0 0 20 20" width="30" height="30" xmlns="http://www.w3.org/2000/svg"><circle cx="10" cy="10" r="8.5" fill="none" stroke="#8b939d" stroke-width="1.5"/><polygon points="10,2.5 13,10 7,10" fill="#e63946"/><polygon points="10,17.5 13,10 7,10" fill="#8b939d" opacity="0.45"/><circle cx="10" cy="10" r="2.2" fill="#ffffff" stroke="#8b939d" stroke-width="1.2"/></svg>';
 
 function showLocationPicker() {
   const picker = $('#locationPicker');
@@ -1067,14 +1067,14 @@ if ($('#geoDetect')) {
       showToast('Location not available on this device');
       return;
     }
-    if (btn) { btn.innerHTML = '<svg viewBox="0 0 20 20" fill="none" width="15" height="15"><circle cx="10" cy="10" r="3.5" stroke="var(--orange)" stroke-width="1.5"/><path d="M10 1.5v3M10 15.5v3M1.5 10h3M15.5 10h3" stroke="var(--orange)" stroke-width="1.5" stroke-linecap="round"/></svg>'; btn.disabled = true; }
+    if (btn) { btn.innerHTML = '<svg viewBox="0 0 20 20" width="20" height="20" xmlns="http://www.w3.org/2000/svg"><circle cx="10" cy="10" r="8.5" fill="none" stroke="#ff7322" stroke-width="1.5"/><polygon points="10,2.5 13,10 7,10" fill="#ff7322"/><polygon points="10,17.5 13,10 7,10" fill="#ff7322" opacity="0.45"/><circle cx="10" cy="10" r="2.2" fill="#ffffff" stroke="#ff7322" stroke-width="1.2"/></svg>'; btn.disabled = true; }
     navigator.geolocation.getCurrentPosition(
       pos => {
         if (btn) btn.disabled = false;
         useCoords(+pos.coords.latitude.toFixed(6), +pos.coords.longitude.toFixed(6), 'your device');
       },
       () => {
-        if (btn) { btn.innerHTML = '<svg viewBox="0 0 20 20" fill="none" width="15" height="15"><circle cx="10" cy="10" r="3.5" stroke="currentColor" stroke-width="1.5"/><path d="M10 1.5v3M10 15.5v3M1.5 10h3M15.5 10h3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>'; btn.disabled = false; }
+        if (btn) { btn.innerHTML = GEO_DETECT_SVG; btn.disabled = false; }
         showToast('Location access denied or unavailable');
       },
       { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
