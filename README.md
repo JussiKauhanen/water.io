@@ -17,12 +17,12 @@
 
 ## Screenshots
 
-| Feed | New Spot | Share Modal |
-|------|----------|-------------|
+| Feed | New Spot |
+|------|----------|
 | ![Feed](screenshots/feed.png) | ![New Spot](screenshots/new-spot.png)|
 
-| Reactions | Merge | Comments |
-|-----------|-------|----------|
+| Reactions |
+|-----------|
 | ![Comments](screenshots/comments.png) |
 
 ## Quick Start
