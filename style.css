@@ -240,6 +240,10 @@ button.ghost{background:none;border:0;color:var(--mut);padding:10px 12px;cursor:
   display:flex;align-items:center;justify-content:center;line-height:1;
   cursor:pointer;
 }
+@media (min-width:760px){
+  /* On desktop the FAB must sit inside the phone mockup (.screen has overflow:hidden) */
+  .fab{ position:absolute; }
+}
 .fab:hover{background:var(--orange-d)}
 .fab:active{transform:scale(0.95)}
 
