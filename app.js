@@ -32,6 +32,7 @@ let importedIds = new Set();      // post IDs that arrived via the current share
 let importBannerDismissed = false;
 let flashPostId = null;           // ID of the just-posted spot (gets the flash animation)
 let flashCommentId = null;        // ID of the just-sent comment (gets the flash animation)
+let searchQuery = '';             // current search filter string
 
 /* ---------- ID Generation ---------- */
 function genId() {
@@ -542,10 +543,37 @@ function renderList() {
     feed.append(banner);
   }
 
+  // Search filter
+  const matchesSearch = p => {
+    if (!searchQuery) return true;
+    const q = searchQuery.toLowerCase();
+    return (p.place||'').toLowerCase().includes(q) ||
+           (p.desc||'').toLowerCase().includes(q) ||
+           (p.user||'').toLowerCase().includes(q) ||
+           (p.comments||[]).some(c => (c.text||'').toLowerCase().includes(q) || (c.user||'').toLowerCase().includes(q));
+  };
+
   // WhatsApp sort: unread first (newest → oldest), then read (newest → oldest)
   const byTs = (a, b) => lastTs(b) - lastTs(a);
-  const unread = db.posts.filter(p => p && unreadCount(p) > 0).sort(byTs);
-  const read   = db.posts.filter(p => p && unreadCount(p) === 0).sort(byTs);
+  const unread = db.posts.filter(p => p && unreadCount(p) > 0 && matchesSearch(p)).sort(byTs);
+  const read   = db.posts.filter(p => p && unreadCount(p) === 0 && matchesSearch(p)).sort(byTs);
+
+  // No-results state when searching
+  if (searchQuery && unread.length === 0 && read.length === 0) {
+    const empty = el('div', '');
+    empty.style.cssText = 'text-align:center;padding:40px 20px;';
+    empty.innerHTML = `<span style="font-size:32px;display:block;margin-bottom:8px;">🔍</span><p style="color:var(--mut);font-size:14px;margin:0">No spots match "<b>${searchQuery}</b>"</p>`;
+    feed.append(empty);
+    flashPostId = null;
+    return;
+  }
+
+  // Flat list when searching (no section dividers)
+  if (searchQuery) {
+    [...unread, ...read].forEach(p => feed.append(waRow(p, unreadCount(p))));
+    flashPostId = null;
+    return;
+  }
 
   let shownReadDiv = false;
   [...unread, ...read].forEach((p, i) => {
@@ -670,8 +698,10 @@ function openThread(id) {
 
   const tv  = $('#threadView');
   const fab = $('#btnNew');
+  const sb  = $('#searchBar');
   if (tv)  { tv.hidden = false; requestAnimationFrame(() => tv.classList.add('thread-open')); }
   if (fab) fab.style.display = 'none';
+  if (sb)  sb.style.display = 'none';
 
   setTimeout(() => { const b = $('#threadBody'); if (b) b.scrollTop = b.scrollHeight; }, 60);
 }
@@ -681,6 +711,8 @@ function closeThread() {
   const fab = $('#btnNew');
   if (tv)  { tv.classList.remove('thread-open'); setTimeout(() => { tv.hidden = true; }, 300); }
   if (fab) fab.style.display = '';
+  const sb  = $('#searchBar');
+  if (sb)  sb.style.display = '';
   openPostId = null;
   renderList();  // refresh list to reflect updated unread counts
 }
@@ -829,6 +861,25 @@ if (threadComposer) {
 }
 
 if ($('#threadBack')) $('#threadBack').onclick = closeThread;
+
+/* ---------- search ---------- */
+if ($('#searchInput')) {
+  $('#searchInput').oninput = e => {
+    searchQuery = e.target.value; // keep raw spacing; matchesSearch trims internally
+    const clear = $('#searchClear');
+    if (clear) clear.hidden = !searchQuery;
+    renderList();
+  };
+}
+if ($('#searchClear')) {
+  $('#searchClear').onclick = () => {
+    searchQuery = '';
+    const inp = $('#searchInput');
+    if (inp) inp.value = '';
+    $('#searchClear').hidden = true;
+    renderList();
+  };
+}
 
 const MAPS = 'https://www.google.com/maps/search/?api=1&query=';
 function mapLink(p) {
@@ -1679,10 +1730,10 @@ if ($('#shareCopy')) {
     input.select();
     try {
       document.execCommand('copy');
-      showToast('Link copied! 📋');
+      showToast('Link copied!');
     } catch(e) {
       navigator.clipboard?.writeText(input.value)
-        .then(() => showToast('Link copied! 📋'))
+        .then(() => showToast('Link copied!'))
         .catch(() => showToast('Select and copy the link'));
     }
   };
