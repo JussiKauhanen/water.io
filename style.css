@@ -718,11 +718,15 @@ button.ghost{background:none;border:0;color:var(--mut);padding:10px 12px;cursor:
    Thread view — slides in from the right over the feed
    ================================================================ */
 .thread-view {
-  position: absolute; inset: 0; z-index: 6;
+  position: fixed; inset: 0; z-index: 6;
   display: flex; flex-direction: column; background: #fbfbfc;
   transform: translateX(100%);
   transition: transform .28s cubic-bezier(.22,.9,.3,1);
   pointer-events: none;
+}
+@media (min-width: 760px) {
+  /* On desktop, thread-view must stay clipped inside the phone mockup */
+  .thread-view { position: absolute; }
 }
 .thread-view[hidden]      { display: none; }
 .thread-view.thread-open  { transform: translateX(0); pointer-events: auto; }
