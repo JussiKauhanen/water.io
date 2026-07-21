@@ -47,17 +47,22 @@ body{
     border-radius:20px;padding:18px 18px 14px;
     box-shadow:0 4px 24px rgba(0,30,60,0.12);
   }
-  .desktop-qr svg{
-    border-radius:8px;
-    display:block;
+  .desktop-qr svg{ border-radius:6px; display:block; }
+  .desktop-qr-header{
+    display:flex;align-items:center;gap:7px;
+    width:100%;margin-bottom:10px;
+  }
+  .desktop-qr-brand{
+    font-size:16px;font-weight:800;letter-spacing:-.4px;color:var(--ink);
   }
   .desktop-qr-label{
-    margin:0;font-size:12px;font-weight:600;color:var(--ink);
-    letter-spacing:.2px;
+    margin:8px 0 2px;font-size:11.5px;font-weight:600;color:var(--ink);
+    letter-spacing:.1px;text-align:center;
   }
   .desktop-qr-url{
-    margin:0;font-size:10px;color:var(--mut);
+    margin:0 0 4px;font-size:9.5px;color:var(--mut);text-align:center;
   }
+  .desktop-qr-waves{ margin-top:2px; }
 }
 
 /* ---- header ---- */
