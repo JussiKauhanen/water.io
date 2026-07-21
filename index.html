@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>water.io</title>
 <link rel="stylesheet" href="style.css">
-<!-- LZString for URL compression -->
 <script src="https://cdn.jsdelivr.net/npm/lz-string@1.5.0/lz-string.min.js"></script>
 </head>
 <body>
@@ -22,9 +21,16 @@
     <header class="top">
       <h1>water<span>.io</span></h1>
       <div class="top-actions">
-        <button class="icon" id="btnShare" title="Share" style="display:none">🔗</button>
-        <button class="icon" id="btnExport" title="Export JSON">↓</button>
-        <button class="icon" id="btnImport" title="Import JSON">↑</button>
+        <button class="icon merge-btn" id="btnMerge" title="Merge shared data" style="display:none">🔄</button>
+        <button class="icon share-btn" id="btnShare" title="Share" style="display:none">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="18" cy="5" r="3"/>
+            <circle cx="6" cy="12" r="3"/>
+            <circle cx="18" cy="19" r="3"/>
+            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
+            <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+          </svg>
+        </button>
         <button class="avatar" id="btnMe" title="Your name"></button>
       </div>
     </header>
@@ -33,6 +39,117 @@
 
     <button class="fab" id="btnNew" aria-label="New spot">+</button>
   </main>
+</div>
+
+<!-- Share Modal - Bottom Sheet -->
+<div class="sheet-wrap bottom-sheet" id="shareModal" hidden>
+  <div class="sheet share-sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <h2>Share</h2>
+      <button class="x" id="shareClose" aria-label="Close">×</button>
+    </div>
+    
+    <div class="share-preview">
+      <div class="share-stats">
+        <span class="share-count" id="shareCount">0 spots</span>
+        <span class="share-time" id="shareTime">Last updated just now</span>
+      </div>
+      <div class="share-url-container">
+        <input type="text" id="shareUrl" readonly onclick="this.select()">
+        <button class="copy-btn" id="shareCopy" title="Copy link">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+            <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="share-divider"></div>
+
+    <div class="share-options">
+      <button class="share-option" data-share="copy">
+        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#6b7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+          <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
+        </svg>
+        <span>Copy</span>
+      </button>
+      <button class="share-option" data-share="whatsapp">
+        <svg viewBox="0 0 24 24" width="24" height="24" fill="#25D366">
+          <path d="M12.032 21.965c-1.92 0-3.78-.54-5.34-1.56l-4.29 1.36 1.37-4.22c-1.08-1.62-1.66-3.52-1.66-5.5 0-5.52 4.48-10 10-10s10 4.48 10 10-4.48 10-10 10zm0-18.96c-4.96 0-8.99 4.03-8.99 8.99 0 1.74.52 3.44 1.48 4.88l-.98 3.03 3.13-.99c1.4.84 3.02 1.31 4.73 1.31 4.96 0 8.99-4.03 8.99-8.99s-4.04-8.99-9-8.99zm5.48 7.23c-.3-.15-1.78-.88-2.06-.98-.28-.1-.49-.15-.7.15s-.81.98-.99 1.18c-.18.2-.36.22-.66.07-.3-.15-1.27-.47-2.42-1.49-.89-.8-1.5-1.78-1.67-2.08-.18-.3-.02-.46.13-.61.14-.14.3-.36.45-.54.15-.18.2-.3.3-.5.1-.2.05-.38-.03-.52-.08-.14-.7-1.68-.96-2.3-.25-.6-.51-.52-.7-.53-.18-.01-.38-.01-.58-.01-.2 0-.52.08-.8.38-.28.3-1.07 1.04-1.07 2.54 0 1.5 1.09 2.95 1.24 3.15.15.2 2.14 3.27 5.18 4.59.72.31 1.29.5 1.73.64.73.24 1.39.2 1.91.12.58-.09 1.78-.73 2.03-1.43.25-.7.25-1.3.17-1.43-.08-.13-.28-.21-.58-.36z"/>
+        </svg>
+        <span>WhatsApp</span>
+      </button>
+      <button class="share-option" data-share="facebook">
+        <svg viewBox="0 0 24 24" width="24" height="24" fill="#1877f2">
+          <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+        </svg>
+        <span>Facebook</span>
+      </button>
+      <button class="share-option" data-share="instagram">
+        <svg viewBox="0 0 24 24" width="24" height="24" fill="url(#instaGrad)">
+          <defs>
+            <linearGradient id="instaGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#f58529"/>
+              <stop offset="30%" stop-color="#dd2a7b"/>
+              <stop offset="60%" stop-color="#8134af"/>
+              <stop offset="100%" stop-color="#515bd4"/>
+            </linearGradient>
+          </defs>
+          <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/>
+        </svg>
+        <span>Instagram</span>
+      </button>
+    </div>
+
+    <div class="share-divider"></div>
+
+    <div class="share-footer">
+      <label class="share-checkbox">
+        <input type="checkbox" id="shareDontAsk">
+        <span>Don't ask again</span>
+      </label>
+    </div>
+  </div>
+</div>
+
+<!-- Reaction Detail Bottom Sheet -->
+<div class="sheet-wrap bottom-sheet" id="reactionSheet" hidden>
+  <div class="sheet reaction-sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <h2 id="reactionTitle">🌊 3 people</h2>
+      <button class="x" id="reactionClose" onclick="document.getElementById('reactionSheet').hidden = true">×</button>
+    </div>
+    <div class="reaction-users" id="reactionUsers"></div>
+    <div class="reaction-actions">
+      <div class="reaction-emoji-picker" id="reactionPicker">
+        ${EMOJI.map(e => `<button class="reaction-emoji-btn" data-emoji="${e}">${e}</button>`).join('')}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Leave notification -->
+<div class="sheet-wrap bottom-sheet" id="leaveModal" hidden>
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <h2>Share your spots?</h2>
+      <button class="x" id="leaveCancel" aria-label="Close">×</button>
+    </div>
+    <p class="hint">You've made changes. Share your water spots before leaving?</p>
+    <div class="row end" style="margin-top: 12px;">
+      <label class="share-checkbox" style="margin-right: auto;">
+        <input type="checkbox" id="leaveDontAsk">
+        <span>Don't ask again</span>
+      </label>
+      <button class="ghost" id="leaveClose">Close</button>
+      <button class="primary" id="leaveShare">Share</button>
+    </div>
+  </div>
 </div>
 
 <!-- username -->
@@ -49,8 +166,9 @@
 </div>
 
 <!-- new post -->
-<div class="sheet-wrap" id="postSheet" hidden>
+<div class="sheet-wrap bottom-sheet" id="postSheet" hidden>
   <div class="sheet">
+    <div class="sheet-handle"></div>
     <div class="sheet-head">
       <h2>New spot</h2>
       <button class="x" id="postCancel" aria-label="Close">×</button>
