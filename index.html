@@ -125,9 +125,7 @@
     </div>
     <div class="reaction-users" id="reactionUsers"></div>
     <div class="reaction-actions">
-      <div class="reaction-emoji-picker" id="reactionPicker">
-        ${EMOJI.map(e => `<button class="reaction-emoji-btn" data-emoji="${e}">${e}</button>`).join('')}
-      </div>
+      <div class="reaction-emoji-picker" id="reactionPicker"></div>
     </div>
   </div>
 </div>
@@ -157,7 +155,7 @@
   <div class="sheet">
     <h2>Pick a username</h2>
     <p class="hint">Shown on your posts. Change it any time from your avatar.</p>
-    <input id="nameInput" maxlength="20" placeholder="e.g. Raoul" autocomplete="off">
+    <input id="nameInput" maxlength="20" placeholder="e.g. Jussi" autocomplete="off">
     <div class="row end">
       <button class="ghost" id="nameCancel">Cancel</button>
       <button class="primary" id="nameSave">Save</button>

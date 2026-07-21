@@ -322,3 +322,116 @@ button.ghost{background:none;border:0;color:var(--mut);padding:10px 12px;cursor:
   font-size: 18px;
   padding: 0 4px;
 }
+
+/* Make sure name sheet is visible */
+#nameSheet {
+  display: flex !important;
+}
+
+#nameSheet[hidden] {
+  display: none !important;
+}
+
+/* Ensure the sheet content is properly styled */
+#nameSheet .sheet {
+  max-width: 400px;
+  width: 100%;
+  padding: 20px;
+}
+
+#nameSheet .sheet h2 {
+  margin-top: 0;
+}
+
+#nameSheet .sheet input {
+  width: 100%;
+  margin-bottom: 12px;
+}
+
+/* Force name sheet to be visible */
+#nameSheet {
+  display: flex !important;
+  align-items: flex-end !important;
+  justify-content: center !important;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+#nameSheet[hidden] {
+  display: none !important;
+}
+
+#nameSheet.visible {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
+#nameSheet .sheet {
+  background: #fff;
+  border-radius: 20px 20px 0 0;
+  padding: 20px;
+  width: 100%;
+  max-width: 400px;
+  transform: translateY(100%);
+  transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+#nameSheet.visible .sheet {
+  transform: translateY(0);
+}
+
+#nameSheet .sheet h2 {
+  margin-top: 0;
+  font-size: 17px;
+}
+
+#nameSheet .sheet input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  font-size: 14px;
+  margin: 8px 0 12px;
+}
+
+#nameSheet .sheet input:focus {
+  outline: 2px solid #fbe0cc;
+  border-color: var(--orange);
+}
+
+#nameSheet .sheet .row {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+
+#nameSheet .sheet .ghost {
+  background: none;
+  border: 0;
+  color: var(--mut);
+  padding: 10px 12px;
+  cursor: pointer;
+  font: 14px var(--font);
+}
+
+#nameSheet .sheet .primary {
+  background: var(--orange);
+  color: #fff;
+  border: 0;
+  border-radius: 12px;
+  padding: 10px 20px;
+  font: 600 14px var(--font);
+  cursor: pointer;
+}
+
+#nameSheet .sheet .primary:hover {
+  background: var(--orange-d);
+}
+
+#nameSheet .hint {
+  font-size: 12.5px;
+  color: var(--mut);
+  margin: 0 0 10px;
+}

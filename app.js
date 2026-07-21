@@ -11,7 +11,7 @@ const LAST_MODIFIED_KEY = 'water.io.modified';
 const SYNC_KEY = 'water.io.sync';
 const EMOJI = ['🏊', '🌊', '❄️', '🔥', '👏'];
 const COLORS = ['#ffd84d','#f78fc2','#3b5bfd','#3ed598','#b28dff','#ff8a5c','#2fd4e8','#ff5f8d'];
-const MAX_LENGTH = 50; // Reduced to 50 chars
+const MAX_LENGTH = 50;
 
 const $ = s => document.querySelector(s);
 const el = (t, c, x) => { const n = document.createElement(t); if (c) n.className = c; if (x != null) n.textContent = x; return n; };
@@ -27,23 +27,20 @@ let db = null;
 let hasChanges = false;
 let lastModified = parseInt(store.getItem(LAST_MODIFIED_KEY)) || Date.now();
 
-/* ---------- ID Generation (Timestamp-based) ---------- */
+/* ---------- ID Generation ---------- */
 function genId() {
-  // Base36 timestamp + random suffix for same-ms conflicts
   const ts = Date.now().toString(36);
   const rand = Math.random().toString(36).slice(2, 5);
-  return ts + rand; // e.g., "k3m8x2a" - sortable AND unique
+  return ts + rand;
 }
 
 function getIdTimestamp(id) {
-  // Extract timestamp from ID (first part before random suffix)
   if (!id) return 0;
-  // IDs are like "k3m8x2a" - timestamp is first part
-  // We can parse base36 back to number
-  const tsPart = id.slice(0, -3); // Remove random suffix
+  const tsPart = id.slice(0, -3);
   return parseInt(tsPart, 36) || 0;
 }
 
+/* ---------- Database functions ---------- */
 function initializeDB() {
   if (!db) {
     db = load();
@@ -69,6 +66,7 @@ function load() {
     if (stored) {
       const d = JSON.parse(stored);
       if (d && d.posts && Array.isArray(d.posts)) {
+        console.log('Loaded from localStorage:', d);
         return clean(d);
       }
     }
@@ -77,17 +75,29 @@ function load() {
   }
   
   // Return default structure with seed data
+  console.log('Creating new database with seed data');
   return { user: null, posts: seed() };
 }
 
 function save() { 
   try { 
     if (!db || db._shared) return;
-    store.setItem(KEY, JSON.stringify(db));
+    
+    // Make sure we're saving the current state
+    const dataToSave = {
+      user: db.user,
+      posts: db.posts
+    };
+    
+    console.log('Saving to localStorage:', dataToSave);
+    store.setItem(KEY, JSON.stringify(dataToSave));
+    
     const now = Date.now();
     store.setItem(LAST_MODIFIED_KEY, String(now));
     lastModified = now;
     hasChanges = true;
+    
+    console.log('Save successful. user saved as:', db.user);
   } catch (e) {
     console.warn('Failed to save:', e);
   } 
@@ -109,11 +119,10 @@ function clean(d) {
   return d;
 }
 
-/* ---------- SIMPLIFIED MERGE (Timestamp-based IDs) ---------- */
+/* ---------- SIMPLIFIED MERGE ---------- */
 function mergeStates(sharedData) {
   if (!sharedData || !sharedData.posts) return sharedData;
   
-  // Get existing data
   let existing = null;
   try {
     const stored = store.getItem(KEY);
@@ -127,7 +136,6 @@ function mergeStates(sharedData) {
     console.warn('Failed to load existing data for merge:', e);
   }
   
-  // If no existing posts, use shared data
   if (!existing || !existing.posts || existing.posts.length === 0) {
     if (sharedData._timestamp) {
       store.setItem(SYNC_KEY, String(sharedData._timestamp));
@@ -137,27 +145,19 @@ function mergeStates(sharedData) {
   
   console.log('Merging shared state with existing data...');
   
-  // Use Map for O(1) lookups by ID (timestamp-based)
   const postMap = new Map();
-  
-  // Add all existing posts
   existing.posts.forEach(p => {
     if (p && p.id) postMap.set(p.id, p);
   });
   
-  // Merge shared posts
   let mergedCount = 0;
   sharedData.posts.forEach(p => {
     if (!p || !p.id) return;
     
     if (postMap.has(p.id)) {
-      // Same post (same timestamp) - merge reactions and comments
       const existingPost = postMap.get(p.id);
-      
-      // Merge reactions (combine both sets)
       existingPost.reacts = { ...existingPost.reacts, ...p.reacts };
       
-      // Merge comments (by ID)
       const commentMap = new Map();
       (existingPost.comments || []).forEach(c => {
         if (c && c.id) commentMap.set(c.id, c);
@@ -166,10 +166,8 @@ function mergeStates(sharedData) {
       (p.comments || []).forEach(c => {
         if (!c || !c.id) return;
         if (commentMap.has(c.id)) {
-          // Merge comment reactions
           const existingComment = commentMap.get(c.id);
           existingComment.reacts = { ...existingComment.reacts, ...c.reacts };
-          // Keep most recent text
           if (c.text) existingComment.text = c.text;
         } else {
           commentMap.set(c.id, c);
@@ -179,7 +177,6 @@ function mergeStates(sharedData) {
       existingPost.comments = Array.from(commentMap.values())
         .sort((a, b) => (a.id || 0) - (b.id || 0));
       
-      // Keep most recent version of post fields
       if (p.desc) existingPost.desc = p.desc;
       if (p.img) existingPost.img = p.img;
       if (p.lat != null) existingPost.lat = p.lat;
@@ -188,12 +185,10 @@ function mergeStates(sharedData) {
       
       mergedCount++;
     } else {
-      // New post - just add it
       postMap.set(p.id, p);
     }
   });
   
-  // Sort by timestamp (newest first) - IDs are timestamp-based!
   const mergedPosts = Array.from(postMap.values())
     .sort((a, b) => {
       const tsA = getIdTimestamp(a.id);
@@ -201,7 +196,6 @@ function mergeStates(sharedData) {
       return tsB - tsA;
     });
   
-  // Build merged database
   const merged = {
     user: sharedData.user || existing.user || null,
     posts: mergedPosts,
@@ -210,17 +204,14 @@ function mergeStates(sharedData) {
     _sharedTimestamp: sharedData._timestamp || Date.now()
   };
   
-  // Store last sync timestamp
   store.setItem(SYNC_KEY, String(merged._timestamp));
   
-  // Save merged data
   try {
     store.setItem(KEY, JSON.stringify(merged));
   } catch(e) {
     console.warn('Failed to save merged data:', e);
   }
   
-  // Show merge notification
   const newCount = mergedPosts.length - existing.posts.length;
   setTimeout(() => {
     if (newCount > 0) {
@@ -250,7 +241,7 @@ function shareState() {
         };
       }).filter(p => p !== null),
       _timestamp: Date.now(),
-      _version: '2.0' // Version bump for timestamp IDs
+      _version: '2.0'
     };
     
     const json = JSON.stringify(cleanData);
@@ -292,7 +283,6 @@ function loadSharedState() {
     
     if (!parsed.posts || !Array.isArray(parsed.posts)) return null;
     
-    // Restore images from localStorage if available
     parsed.posts = parsed.posts.map(p => {
       if (!p) return null;
       if (p.img && typeof p.img === 'string' && !p.img.startsWith('data:')) {
@@ -445,7 +435,6 @@ function render() {
     empty.style.cssText = 'text-align:center;padding:60px 20px;color:var(--mut);';
     feed.append(empty);
   } else {
-    // Sort by timestamp (newest first) - IDs are timestamp-based!
     db.posts.slice().sort((a, b) => {
       const tsA = getIdTimestamp(a.id);
       const tsB = getIdTimestamp(b.id);
@@ -526,7 +515,10 @@ function card(p) {
   return c;
 }
 
-const refresh = () => { save(); render(); };
+const refresh = () => { 
+  save(); 
+  render(); 
+};
 
 const MAPS = 'https://www.google.com/maps/search/?api=1&query=';
 function mapLink(p) {
@@ -538,7 +530,7 @@ function mapLink(p) {
   return null;
 }
 
-/* ---------- REACTIONS with bottom sheet ---------- */
+/* ---------- REACTIONS ---------- */
 function reacts(map, done, parent) {
   const wrap = el('div', 'reacts');
   
@@ -558,6 +550,8 @@ function reacts(map, done, parent) {
   
   const add = el('button', 'chip add', '☺');
   add.onclick = () => {
+    if (!requireUser()) return;
+    
     const picker = el('div', 'reacts');
     EMOJI.forEach(e => {
       const b = el('button', 'chip', e);
@@ -571,7 +565,11 @@ function reacts(map, done, parent) {
 }
 
 function toggle(map, e) {
-  if (!requireUser()) return;
+  if (!requireUser()) {
+    console.warn('Cannot toggle reaction: No user set');
+    return;
+  }
+  
   if (!map[e]) map[e] = [];
   const u = map[e];
   const i = u.indexOf(db.user);
@@ -627,6 +625,9 @@ function showReactionBottomSheet(emoji, users, map, done) {
   });
   
   sheet.hidden = false;
+  sheet.style.display = 'flex';
+  sheet.style.opacity = '1';
+  sheet.style.pointerEvents = 'auto';
   setTimeout(() => {
     sheet.classList.add('visible');
   }, 10);
@@ -663,7 +664,7 @@ function comments(p) {
 
   const form = el('form', 'cm-form');
   const input = el('input');
-  input.placeholder = 'Your reply';
+  input.placeholder = 'Your reply (max ' + MAX_LENGTH + ')';
   input.maxLength = MAX_LENGTH;
   
   const counter = el('span', 'cm-counter', '0/' + MAX_LENGTH);
@@ -688,14 +689,21 @@ function comments(p) {
   form.onsubmit = ev => {
     ev.preventDefault();
     const t = input.value.trim();
-    if (!t || !requireUser()) return;
+    if (!t) {
+      showToast('Please enter a comment');
+      return;
+    }
+    if (!requireUser()) {
+      showToast('Please set a username first');
+      return;
+    }
     if (t.length > MAX_LENGTH) {
       showToast('Comment too long! Max ' + MAX_LENGTH + ' characters');
       return;
     }
     if (!p.comments) p.comments = [];
     p.comments.push({ 
-      id: genId(), // Timestamp-based ID!
+      id: genId(),
       user: db.user, 
       text: t, 
       ts: Date.now(), 
@@ -710,40 +718,147 @@ function comments(p) {
 /* ---------- sheets ---------- */
 const show = s => {
   const el = $(s);
-  if (el) el.hidden = false;
+  if (el) {
+    el.hidden = false;
+    el.style.display = 'flex';
+    el.style.opacity = '1';
+    el.style.pointerEvents = 'auto';
+    if (el.classList.contains('bottom-sheet')) {
+      setTimeout(() => el.classList.add('visible'), 10);
+    }
+  }
 };
+
 const hide = s => {
   const el = $(s);
-  if (el) el.hidden = true;
+  if (el) {
+    if (el.classList.contains('bottom-sheet')) {
+      el.classList.remove('visible');
+      setTimeout(() => { 
+        el.hidden = true;
+        el.style.display = 'none';
+      }, 300);
+    } else {
+      el.hidden = true;
+      el.style.display = 'none';
+    }
+  }
 };
 
 function requireUser() {
-  if (db.user) return true;
-  show('#nameSheet'); 
+  console.log('requireUser called, db.user:', db.user);
+  
+  if (db.user && db.user.trim() !== '') {
+    console.log('User exists:', db.user);
+    return true;
+  }
+  
+  console.log('No user found, showing name sheet');
+  
+  const sheet = $('#nameSheet');
+  if (sheet) {
+    sheet.hidden = false;
+    sheet.style.display = 'flex';
+    sheet.style.opacity = '1';
+    sheet.style.pointerEvents = 'auto';
+    setTimeout(() => {
+      sheet.classList.add('visible');
+    }, 10);
+    console.log('Name sheet should now be visible');
+  } else {
+    console.error('Name sheet element not found!');
+  }
+  
   const input = $('#nameInput');
-  if (input) input.focus();
+  if (input) {
+    input.value = '';
+    setTimeout(() => {
+      input.focus();
+      input.select();
+    }, 100);
+  }
+  
   return false;
 }
 
-// Name sheet handlers
+/* ---------- Name Sheet ---------- */
 $('#nameSave').onclick = () => {
-  const n = $('#nameInput');
-  if (!n) return;
-  const name = n.value.trim();
-  if (!name) return n.focus();
-  db.user = name; 
-  hide('#nameSheet'); 
-  refresh();
+  const input = $('#nameInput');
+  if (!input) return;
+  
+  const name = input.value.trim();
+  console.log('Name input value:', name);
+  
+  if (!name || name === '') {
+    showToast('Please enter a username');
+    input.focus();
+    return;
+  }
+  
+  // Save the username
+  db.user = name;
+  console.log('User set to:', db.user);
+  
+  // Save to localStorage immediately
+  save();
+  
+  // Hide the sheet properly
+  const sheet = $('#nameSheet');
+  if (sheet) {
+    sheet.classList.remove('visible');
+    sheet.style.display = 'none';
+    sheet.hidden = true;
+  }
+  
+  // Refresh the UI
+  render();
+  showToast('Welcome, ' + name + '! 🏊');
+  
+  console.log('Current db after save:', db);
 };
-$('#nameCancel').onclick = () => hide('#nameSheet');
+
+$('#nameCancel').onclick = () => {
+  const sheet = $('#nameSheet');
+  if (sheet) {
+    sheet.classList.remove('visible');
+    sheet.style.display = 'none';
+    sheet.hidden = true;
+  }
+};
+
 $('#btnMe').onclick = () => { 
   const input = $('#nameInput');
-  if (input) input.value = db.user || ''; 
-  show('#nameSheet'); 
-  if (input) input.focus(); 
+  if (input) {
+    input.value = db.user || ''; 
+  }
+  
+  const sheet = $('#nameSheet');
+  if (sheet) {
+    sheet.hidden = false;
+    sheet.style.display = 'flex';
+    sheet.style.opacity = '1';
+    sheet.style.pointerEvents = 'auto';
+    setTimeout(() => {
+      sheet.classList.add('visible');
+    }, 10);
+  }
+  
+  if (input) {
+    setTimeout(() => {
+      input.focus();
+      input.select();
+    }, 100);
+  }
 };
-$('#nameInput').addEventListener('keydown', e => { if (e.key === 'Enter') $('#nameSave').click(); });
 
+$('#nameInput').addEventListener('keydown', (e) => { 
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    $('#nameSave').click();
+  }
+});
+
+// Close name sheet on backdrop click - but only if user wants to
 document.querySelectorAll('.sheet-wrap').forEach(w => {
   if (!w) return;
   w.onclick = e => { 
@@ -754,11 +869,32 @@ document.querySelectorAll('.sheet-wrap').forEach(w => {
         hideShareModal();
       } else if (w.id === 'reactionSheet') {
         hideReactionSheet();
+      } else if (w.id === 'nameSheet') {
+        // Don't close on backdrop click for name sheet
+        return;
       } else {
         w.hidden = true;
+        w.style.display = 'none';
       }
     }
   };
+});
+
+// Close reaction sheet function
+function closeReactionSheet() {
+  const sheet = $('#reactionSheet');
+  if (sheet) {
+    sheet.hidden = true;
+    sheet.style.display = 'none';
+  }
+}
+
+// Close on Escape key
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    closeReactionSheet();
+    hideShareModal();
+  }
 });
 
 /* ---------- new post ---------- */
@@ -770,6 +906,7 @@ function setGeo(state, text) {
   const textEl = $('#geoText');
   if (textEl) textEl.textContent = text;
 }
+
 function useCoords(lat, lng, from) {
   draft.lat = lat; draft.lng = lng;
   setGeo('ok', `${lat.toFixed(4)}, ${lng.toFixed(4)} · from ${from}`);
@@ -802,7 +939,9 @@ $('#btnNew').onclick = () => {
   show('#postSheet');
   askDevice();
 };
+
 $('#postCancel').onclick = () => hide('#postSheet');
+
 $('#geoManual').onclick = () => { 
   const manual = $('#manualRow');
   if (manual) manual.hidden = false; 
@@ -852,7 +991,11 @@ $('#postSave').onclick = () => {
   const descInput = $('#pDesc');
   if (!descInput) return;
   const desc = descInput.value.trim().slice(0, MAX_LENGTH);
-  if (!desc) return descInput.focus();
+  if (!desc) {
+    showToast('Please enter a description');
+    descInput.focus();
+    return;
+  }
   if (desc.length > MAX_LENGTH) {
     showToast('Description too long! Max ' + MAX_LENGTH + ' characters');
     return;
@@ -860,7 +1003,7 @@ $('#postSave').onclick = () => {
   
   if (!db.posts) db.posts = [];
   db.posts.push({
-    id: genId(), // Timestamp-based ID!
+    id: genId(),
     user: db.user, 
     desc, 
     img: draft.img,
@@ -873,6 +1016,7 @@ $('#postSave').onclick = () => {
   });
   hide('#postSheet'); 
   refresh();
+  showToast('Spot added!');
 };
 
 /* ---------- SHARING ---------- */
@@ -903,6 +1047,9 @@ function showShareModal() {
   const modal = $('#shareModal');
   if (!modal) return;
   modal.hidden = false;
+  modal.style.display = 'flex';
+  modal.style.opacity = '1';
+  modal.style.pointerEvents = 'auto';
   updateSharePreview();
   
   setTimeout(() => {
@@ -921,6 +1068,7 @@ function hideShareModal() {
   modal.classList.remove('visible');
   setTimeout(() => {
     modal.hidden = true;
+    modal.style.display = 'none';
   }, 300);
 }
 
@@ -1124,6 +1272,9 @@ function showLeaveModal() {
   const modal = $('#leaveModal');
   if (!modal) return;
   modal.hidden = false;
+  modal.style.display = 'flex';
+  modal.style.opacity = '1';
+  modal.style.pointerEvents = 'auto';
   const checkbox = $('#leaveDontAsk');
   if (checkbox) checkbox.checked = false;
   setTimeout(() => modal.classList.add('visible'), 10);
@@ -1133,7 +1284,10 @@ function hideLeaveModal() {
   const modal = $('#leaveModal');
   if (!modal) return;
   modal.classList.remove('visible');
-  setTimeout(() => modal.hidden = true, 300);
+  setTimeout(() => {
+    modal.hidden = true;
+    modal.style.display = 'none';
+  }, 300);
 }
 
 function handleLeaveClose() {
@@ -1184,21 +1338,21 @@ function seed() {
   return [
     { 
       id: (now - 26 * h).toString(36) + 'a1', 
-      user: 'Lenni-Kalle', 
+      user: 'Jussi', 
       desc: 'Calm bay at Seurasaari, sandy bottom, easy entry.',
       img: null, 
       lat: 60.1789, 
       lng: 24.8836, 
       place: 'Seurasaari, Helsinki', 
       ts: now - 26 * h,
-      reacts: { '🌊': ['Jussi', 'Laura P.'], '🏊': ['Laura P.'] },
+      reacts: { '🌊': ['Martti', 'Laura P.'], '🏊': ['Laura P.'] },
       comments: [
         { 
           id: (now - 20 * h).toString(36) + 'c1',
-          user: 'Jussi', 
+          user: 'Martti', 
           text: 'Went yesterday — 17°C, perfect.', 
           ts: now - 20 * h, 
-          reacts: { '👏': ['Lenni-Kalle'] } 
+          reacts: { '👏': ['Jussi'] } 
         },
         { 
           id: (now - 5 * h).toString(36) + 'c2',
@@ -1218,10 +1372,10 @@ function seed() {
       lng: 25.1442, 
       place: 'Vuosaari pier, Helsinki', 
       ts: now - 9 * h,
-      reacts: { '❄️': ['Lenni-Kalle', 'Jussi'] },
+      reacts: { '❄️': ['Jussi', 'Martti'] },
       comments: [{ 
         id: (now - 2 * h).toString(36) + 'c3',
-        user: 'Lenni-Kalle', 
+        user: 'Jussi', 
         text: 'Ice hole kept open all January.', 
         ts: now - 2 * h, 
         reacts: { '🔥': ['Laura P.'] } 
@@ -1229,7 +1383,7 @@ function seed() {
     },
     { 
       id: (now - 40 * 60e3).toString(36) + 'a3',
-      user: 'Jussi', 
+      user: 'Martti', 
       desc: 'Pikku Kallahti — shallow, warm, good for a long swim.',
       img: null, 
       lat: null, 
@@ -1242,13 +1396,41 @@ function seed() {
   ];
 }
 
-/* ---------- go ---------- */
-initializeDB();
-render();
-if (!persists) console.info('water.io: browser storage unavailable on file:// — data lasts this session only.');
+/* ---------- Debug function ---------- */
+function debugStorage() {
+  console.log('=== DEBUG STORAGE ===');
+  console.log('Current db:', db);
+  console.log('db.user:', db ? db.user : 'db is null');
+  console.log('LocalStorage data:', store.getItem(KEY));
+  try {
+    const parsed = JSON.parse(store.getItem(KEY));
+    console.log('Parsed from localStorage:', parsed);
+    console.log('user from localStorage:', parsed ? parsed.user : 'null');
+  } catch(e) {
+    console.log('Error parsing localStorage:', e);
+  }
+  console.log('=== END DEBUG ===');
+}
 
+/* ---------- go ---------- */
+console.log('Initializing water.io...');
+
+// Initialize database
+initializeDB();
+console.log('DB initialized:', db);
+
+// Render the feed
+render();
+
+// Check for persistence
+if (!persists) {
+  console.info('water.io: browser storage unavailable on file:// — data lasts this session only.');
+}
+
+// Check for merge opportunities
 checkForMerge();
 
+// Show shared indicator if needed
 if (db._shared) {
   console.info('water.io: Loaded shared state from URL');
   const indicator = el('div', 'shared-indicator');
@@ -1257,8 +1439,26 @@ if (db._shared) {
   if (top) top.append(indicator);
 }
 
+// Reset hasChanges after initial load
 setTimeout(() => {
   hasChanges = false;
 }, 200);
+
+// Debug after load
+setTimeout(debugStorage, 500);
+
+// Make debug functions available globally
+window.debugStorage = debugStorage;
+window.requireUser = requireUser;
+
+// FORCE SHOW NAME SHEET IF NO USER
+if (!db.user || db.user.trim() === '') {
+  console.log('No user found on startup, showing name sheet');
+  setTimeout(() => {
+    requireUser();
+  }, 500);
+}
+
+console.log('water.io ready!');
 
 })();
