@@ -21,15 +21,12 @@
     <header class="top">
       <h1>water<span>.io</span></h1>
       <div class="top-actions">
-        <button class="icon merge-btn" id="btnMerge" title="Merge shared data" style="display:none">🔄</button>
+        <button class="sync-pill" id="syncPill" style="display:none"></button>
         <button class="icon share-btn" id="btnShare" title="Share" style="display:none">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="18" cy="5" r="3"/>
-            <circle cx="6" cy="12" r="3"/>
-            <circle cx="18" cy="19" r="3"/>
-            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
-            <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
-          </svg>
+<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle>
+                <path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"></path>
+              </svg>
         </button>
         <button class="avatar" id="btnMe" title="Your name"></button>
       </div>
@@ -104,14 +101,6 @@
       </button>
     </div>
 
-    <div class="share-divider"></div>
-
-    <div class="share-footer">
-      <label class="share-checkbox">
-        <input type="checkbox" id="shareDontAsk">
-        <span>Don't ask again</span>
-      </label>
-    </div>
   </div>
 </div>
 
@@ -130,25 +119,6 @@
   </div>
 </div>
 
-<!-- Leave notification -->
-<div class="sheet-wrap bottom-sheet" id="leaveModal" hidden>
-  <div class="sheet">
-    <div class="sheet-handle"></div>
-    <div class="sheet-head">
-      <h2>Share your spots?</h2>
-      <button class="x" id="leaveCancel" aria-label="Close">×</button>
-    </div>
-    <p class="hint">You've made changes. Share your water spots before leaving?</p>
-    <div class="row end" style="margin-top: 12px;">
-      <label class="share-checkbox" style="margin-right: auto;">
-        <input type="checkbox" id="leaveDontAsk">
-        <span>Don't ask again</span>
-      </label>
-      <button class="ghost" id="leaveClose">Close</button>
-      <button class="primary" id="leaveShare">Share</button>
-    </div>
-  </div>
-</div>
 
 <!-- username -->
 <div class="sheet-wrap" id="nameSheet" hidden>
@@ -159,6 +129,12 @@
     <div class="row end">
       <button class="ghost" id="nameCancel">Cancel</button>
       <button class="primary" id="nameSave">Save</button>
+    </div>
+    <div class="name-footer">
+      <div id="clearDataWrap">
+        <button class="ghost-danger" id="clearDataBtn">Clear all data</button>
+      </div>
+      <span class="app-version" id="appVersion"></span>
     </div>
   </div>
 </div>
@@ -172,31 +148,90 @@
       <button class="x" id="postCancel" aria-label="Close">×</button>
     </div>
 
-    <label class="drop" id="dropLabel">
+    <div class="post-field" id="namePicker" hidden>
+      <span class="post-icon">
+        <svg viewBox="0 0 20 20" fill="none" width="18" height="18">
+          <circle cx="10" cy="6.5" r="3.25" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M3.5 17c0-3.3 2.9-5.5 6.5-5.5s6.5 2.2 6.5 5.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+      </span>
+      <div class="field">
+        <input id="pName" maxlength="20" placeholder="Your name — shown on the post" autocomplete="off">
+      </div>
+    </div>
+
+    <div class="post-field">
+      <span class="post-icon">
+        <svg viewBox="0 0 20 20" fill="none" width="18" height="18">
+          <rect x="3" y="2" width="14" height="16" rx="2.5" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M6.5 7.5h7M6.5 11h5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+      </span>
+      <div class="field">
+        <textarea id="pDesc" maxlength="50" rows="2" placeholder="Describe the spot in a few words"></textarea>
+        <div class="count" id="descCount">0/50</div>
+      </div>
+    </div>
+
+    <div class="post-field" id="locationPicker">
+      <span class="post-icon">
+        <svg viewBox="0 0 20 20" fill="none" width="18" height="18">
+          <path d="M10 1.5A5.5 5.5 0 004.5 7C4.5 11 10 18.5 10 18.5S15.5 11 15.5 7A5.5 5.5 0 0010 1.5z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+          <circle cx="10" cy="7" r="2" stroke="currentColor" stroke-width="1.5"/>
+        </svg>
+      </span>
+      <div class="post-loc-wrap">
+        <input id="pPlace" maxlength="80" placeholder="e.g. Kaitalampi, Espoo">
+        <button type="button" id="geoDetect" class="geo-btn" title="Detect my location">
+          <svg viewBox="0 0 20 20" fill="none" width="15" height="15">
+            <circle cx="10" cy="10" r="3.5" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M10 1.5v3M10 15.5v3M1.5 10h3M15.5 10h3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <label class="photo-add" id="dropLabel">
       <input type="file" id="pImg" accept="image/*" hidden>
-      <img class="preview" id="pPrev" hidden alt="">
-      <span class="drop-cta" id="dropCta">
-        <b>+</b> Add a photo
-        <em>we'll read the location from it</em>
+      <span class="photo-cta" id="dropCta">
+        <svg viewBox="0 0 20 20" fill="none" width="14" height="14">
+          <rect x="2.5" y="4.5" width="15" height="11" rx="2.5" stroke="currentColor" stroke-width="1.5"/>
+          <circle cx="10" cy="10" r="2.75" stroke="currentColor" stroke-width="1.5"/>
+        </svg>
+        Add photo
+        <em>optional</em>
+      </span>
+      <span class="photo-chosen" id="photoChosen" hidden>
+        <img class="preview" id="pPrev" alt="">
+        <span class="photo-chosen-label">Photo attached</span>
+        <button type="button" class="photo-remove" id="photoRemove" aria-label="Remove photo">×</button>
       </span>
     </label>
 
-    <div class="field">
-      <textarea id="pDesc" maxlength="60" rows="2"
-        placeholder="Describe the spot in a few words"></textarea>
-      <div class="count" id="descCount">0 / 60</div>
-    </div>
-
-    <div class="geobar" id="geoBar">
+    <div class="geobar ok" id="geoBar" hidden>
       <span class="dot"></span>
-      <span id="geoText">Locating…</span>
-      <button class="link" id="geoManual">add address</button>
-    </div>
-    <div class="row" id="manualRow" hidden>
-      <input id="pPlace" maxlength="80" placeholder="Address or place name">
+      <span id="geoText"></span>
+      <button class="link" id="geoChange">change</button>
     </div>
 
-    <button class="primary block" id="postSave">Post spot</button>
+    <button class="primary block" id="postSave" disabled>Post spot</button>
+  </div>
+</div>
+
+<!-- Sync Sheet -->
+<div class="sheet-wrap bottom-sheet" id="syncSheet" hidden>
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head">
+      <h2>Last sync</h2>
+      <button class="x" id="syncClose" aria-label="Close">×</button>
+    </div>
+    <div class="sync-meta">
+      <div class="sync-from" id="syncFrom"></div>
+      <div class="sync-time" id="syncTime"></div>
+    </div>
+    <div class="sync-stats" id="syncStats"></div>
+    <div class="sync-graph" id="syncGraph"></div>
   </div>
 </div>
 

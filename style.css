@@ -121,7 +121,34 @@ button.primary{
   padding:11px 20px;font:600 14px var(--font);cursor:pointer;
 }
 button.primary:hover{background:var(--orange-d)}
+button.primary:disabled{opacity:.4;cursor:not-allowed}
 button.primary.block{width:100%;margin-top:14px;padding:13px}
+
+/* Post button — 3-state progress fill */
+#postSave {
+  background: linear-gradient(to right, var(--orange) 50%, #fff 50%);
+  background-size: 200% 100%;
+  background-position: 100% 50%;
+  color: var(--orange);
+  border: 1.5px solid var(--orange) !important;
+  transition: background-position 0.4s ease, color 0.3s ease;
+  opacity: 1 !important;
+  cursor: not-allowed;
+}
+#postSave:hover { background-position: 100% 50%; }
+#postSave.fill-half {
+  background-position: 36% 50%;
+  color: #fff;
+}
+#postSave.fill-full {
+  background-position: 0% 50%;
+  color: #fff;
+  cursor: pointer;
+}
+#postSave.fill-full:hover {
+  background-position: 100% 50%;
+  color: var(--orange);
+}
 button.ghost{background:none;border:0;color:var(--mut);padding:10px 12px;cursor:pointer;font:14px var(--font)}
 .link{background:none;border:0;color:var(--orange);font:600 12px var(--font);cursor:pointer;padding:0;text-decoration:underline}
 
@@ -212,15 +239,36 @@ button.ghost{background:none;border:0;color:var(--mut);padding:10px 12px;cursor:
 .reaction-emoji-btn.active{border-color:var(--orange);background:#fdf0e6}
 
 /* ---- Photo drop ---- */
-.drop{display:block;cursor:pointer}
-.drop-cta{display:flex;flex-direction:column;align-items:center;gap:2px;padding:20px 12px;border:1.5px dashed #dfe3e8;border-radius:14px;color:var(--mut);font-size:14px;background:#fafbfc}
-.drop-cta b{color:var(--orange);font-size:20px;line-height:1}
-.drop-cta em{font-style:normal;font-size:11.5px;color:#a9b0b9}
-.drop:hover .drop-cta{border-color:var(--orange);background:#fff8f3}
-.preview{width:100%;border-radius:14px;display:block;margin-top:6px}
+/* ---- compact optional photo ---- */
+.photo-add{display:block;cursor:pointer;margin:10px 0 0 30px}
+.photo-cta,.photo-chosen{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--mut)}
+.photo-cta em{font-style:normal;font-size:11.5px;color:#a9b0b9}
+.photo-cta svg{display:block}
+.photo-add:hover .photo-cta{color:var(--orange)}
+.photo-cta[hidden],.photo-chosen[hidden]{display:none}
+.preview{width:28px;height:28px;object-fit:cover;border-radius:7px;display:block}
+.photo-chosen-label{color:#5d656e}
+.photo-remove{border:0;background:none;color:var(--mut);font-size:16px;line-height:1;cursor:pointer;padding:0 2px}
+.photo-remove:hover{color:var(--orange)}
 
 .field{position:relative;margin-top:12px}
 .count{position:absolute;right:10px;bottom:8px;font-size:11px;color:#b6bcc4;transition:color 0.2s}
+
+/* ---- Post form fields ---- */
+.post-field{display:flex;align-items:flex-start;gap:10px;margin-top:14px}
+.post-icon{flex:0 0 20px;height:40px;display:flex;align-items:center;justify-content:center;color:var(--mut)}
+.post-icon svg{display:block}
+.post-field .field{flex:1;margin-top:0}
+.post-loc-wrap{flex:1;display:flex;gap:6px;align-items:stretch}
+.post-loc-wrap input{flex:1}
+.geo-btn{
+  flex:0 0 40px;width:40px;min-height:40px;
+  border:1px solid var(--line);border-radius:10px;background:#f8f9fa;
+  cursor:pointer;display:grid;place-items:center;color:var(--mut);
+}
+.geo-btn:hover{background:#f0f1f3;color:var(--ink)}
+.geo-btn:disabled{opacity:.5;cursor:default}
+.geo-btn svg{display:block}
 
 .geobar{display:flex;align-items:center;gap:7px;margin-top:12px;font-size:12.5px;color:#5d656e;background:#f6f7f9;padding:9px 12px;border-radius:12px}
 .geobar .dot{width:7px;height:7px;border-radius:50%;background:#c6ccd3;flex:0 0 auto}
@@ -263,65 +311,69 @@ button.ghost{background:none;border:0;color:var(--mut);padding:10px 12px;cursor:
 .img-placeholder{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px 20px;color:#8b939d;font-size:13px;gap:6px;background:#f5f6f8}
 .img-placeholder span:first-child{font-size:28px}
 
-.merge-btn {
-  background: #fff3e6 !important;
-  border-color: var(--orange) !important;
-  color: var(--orange) !important;
-  font-size: 16px;
-  animation: pulse-merge 2s infinite;
-}
-
-.merge-btn:hover {
-  background: #ffe8d6 !important;
-}
-
-@keyframes pulse-merge {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.05); }
-}
-
-/* Merge notification */
-.merge-notification {
-  background: #fff3e6;
-  border: 1px solid var(--orange);
-  border-radius: 12px;
-  padding: 12px 16px;
-  margin-bottom: 12px;
+/* ---- Sync Pill ---- */
+.sync-pill {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  border: 1px solid var(--line);
+  background: #fff;
+  border-radius: 20px;
+  padding: 4px 10px;
+  font: 11px var(--font);
+  color: var(--mut);
+  cursor: pointer;
+  white-space: nowrap;
+  gap: 0;
 }
-
-.merge-notification span {
-  font-size: 14px;
+.sync-pill:hover {
+  background: #f7f8fa;
   color: var(--ink);
 }
 
-.merge-notification .merge-now {
-  background: var(--orange);
-  color: white;
-  border: none;
-  padding: 6px 16px;
-  border-radius: 20px;
+/* ---- Sync Sheet ---- */
+.sync-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0 10px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 10px;
+}
+.sync-from {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
   font-weight: 600;
-  cursor: pointer;
-  font-size: 13px;
-  white-space: nowrap;
 }
-
-.merge-notification .merge-now:hover {
-  background: var(--orange-d);
-}
-
-.merge-notification .merge-dismiss {
-  background: none;
-  border: none;
+.sync-time {
+  font-size: 12px;
   color: var(--mut);
-  cursor: pointer;
-  font-size: 18px;
-  padding: 0 4px;
+  text-align: right;
 }
+.sync-stats {
+  font-size: 13px;
+  color: var(--mut);
+  margin-bottom: 16px;
+}
+.sync-graph {
+  display: flex;
+  justify-content: center;
+  padding: 4px 0 8px;
+  overflow: visible;
+}
+
+/* ---- Name sheet footer ---- */
+.name-footer{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-top:20px;padding-top:14px;border-top:1px solid var(--line);
+}
+.app-version{font-size:11px;color:#b6bcc4}
+.ghost-danger{background:none;border:0;color:#c0392b;font:13px var(--font);cursor:pointer;padding:4px 0;opacity:.65}
+.ghost-danger:hover{opacity:1}
+.danger-confirm{font-size:13px;color:var(--ink);margin:12px 0 0}
+.danger-btn{background:#e74c3c;color:#fff;border:0;border-radius:10px;padding:8px 16px;font:600 13px var(--font);cursor:pointer}
+.danger-btn:hover{background:#c0392b}
 
 /* Make sure name sheet is visible */
 #nameSheet {

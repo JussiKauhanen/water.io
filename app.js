@@ -6,12 +6,13 @@ const KEY = 'water.io.v3';
 const SHARE_KEY = 'd';
 const MERGE_KEY = 'merge';
 const IMAGE_PREFIX = 'water.img.';
-const DONT_ASK_KEY = 'water.io.dontAsk';
 const LAST_MODIFIED_KEY = 'water.io.modified';
 const SYNC_KEY = 'water.io.sync';
+const MERGE_HISTORY_KEY = 'water.io.merges';
 const EMOJI = ['🏊', '🌊', '❄️', '🔥', '👏'];
 const COLORS = ['#ffd84d','#f78fc2','#3b5bfd','#3ed598','#b28dff','#ff8a5c','#2fd4e8','#ff5f8d'];
 const MAX_LENGTH = 50;
+const VERSION = '1.0';
 
 const $ = s => document.querySelector(s);
 const el = (t, c, x) => { const n = document.createElement(t); if (c) n.className = c; if (x != null) n.textContent = x; return n; };
@@ -24,7 +25,6 @@ const store = (() => {
 const persists = store === localStorage;
 
 let db = null;
-let hasChanges = false;
 let lastModified = parseInt(store.getItem(LAST_MODIFIED_KEY)) || Date.now();
 
 /* ---------- ID Generation ---------- */
@@ -95,8 +95,7 @@ function save() {
     const now = Date.now();
     store.setItem(LAST_MODIFIED_KEY, String(now));
     lastModified = now;
-    hasChanges = true;
-    
+
     console.log('Save successful. user saved as:', db.user);
   } catch (e) {
     console.warn('Failed to save:', e);
@@ -191,8 +190,8 @@ function mergeStates(sharedData) {
   
   const mergedPosts = Array.from(postMap.values())
     .sort((a, b) => {
-      const tsA = getIdTimestamp(a.id);
-      const tsB = getIdTimestamp(b.id);
+      const tsA = getIdTimestamp(a.id) || a.ts || 0;
+      const tsB = getIdTimestamp(b.id) || b.ts || 0;
       return tsB - tsA;
     });
   
@@ -205,14 +204,29 @@ function mergeStates(sharedData) {
   };
   
   store.setItem(SYNC_KEY, String(merged._timestamp));
-  
+
+  // Record merge event for sync history
+  const newCount = mergedPosts.length - existing.posts.length;
+  try {
+    const event = {
+      ts: Date.now(),
+      from: sharedData.user || null,
+      newPosts: newCount,
+      postsMerged: mergedCount,
+      totalPosts: mergedPosts.length
+    };
+    const raw = store.getItem(MERGE_HISTORY_KEY);
+    const hist = raw ? JSON.parse(raw) : [];
+    hist.unshift(event);
+    store.setItem(MERGE_HISTORY_KEY, JSON.stringify(hist.slice(0, 20)));
+  } catch(e) {}
+
   try {
     store.setItem(KEY, JSON.stringify(merged));
   } catch(e) {
     console.warn('Failed to save merged data:', e);
   }
-  
-  const newCount = mergedPosts.length - existing.posts.length;
+
   setTimeout(() => {
     if (newCount > 0) {
       showToast(`Added ${newCount} new spot${newCount > 1 ? 's' : ''} from shared link`);
@@ -436,8 +450,8 @@ function render() {
     feed.append(empty);
   } else {
     db.posts.slice().sort((a, b) => {
-      const tsA = getIdTimestamp(a.id);
-      const tsB = getIdTimestamp(b.id);
+      const tsA = getIdTimestamp(a.id) || a.ts || 0;
+      const tsB = getIdTimestamp(b.id) || b.ts || 0;
       return tsB - tsA;
     }).forEach(p => {
       if (p) feed.appendChild(card(p));
@@ -455,11 +469,7 @@ function render() {
     shareBtn.style.display = db.posts && db.posts.length > 0 ? 'flex' : 'none';
   }
   
-  const mergeBtn = $('#btnMerge');
-  if (mergeBtn) {
-    mergeBtn.style.display = 'none';
-  }
-  
+  updateSyncPill();
   updateSharePreview();
 }
 
@@ -813,11 +823,15 @@ $('#nameSave').onclick = () => {
   // Refresh the UI
   render();
   showToast('Welcome, ' + name + '! 🏊');
-  
-  console.log('Current db after save:', db);
+
+  if (pendingPost) {
+    pendingPost = false;
+    doPost();
+  }
 };
 
 $('#nameCancel').onclick = () => {
+  pendingPost = false;
   const sheet = $('#nameSheet');
   if (sheet) {
     sheet.classList.remove('visible');
@@ -863,12 +877,12 @@ document.querySelectorAll('.sheet-wrap').forEach(w => {
   if (!w) return;
   w.onclick = e => { 
     if (e.target === w) {
-      if (w.id === 'leaveModal') {
-        handleLeaveClose();
-      } else if (w.id === 'shareModal') {
+      if (w.id === 'shareModal') {
         hideShareModal();
       } else if (w.id === 'reactionSheet') {
         hideReactionSheet();
+      } else if (w.id === 'syncSheet') {
+        hideSyncSheet();
       } else if (w.id === 'nameSheet') {
         // Don't close on backdrop click for name sheet
         return;
@@ -894,60 +908,116 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     closeReactionSheet();
     hideShareModal();
+    hideSyncSheet();
   }
 });
 
 /* ---------- new post ---------- */
 let draft = { img: null, lat: null, lng: null, place: '' };
+let pendingPost = false;
 
-function setGeo(state, text) {
+function validatePost() {
+  const descVal = (($('#pDesc') || {}).value || '').trim();
+  const hasDesc = descVal.length > 0;
+  const placeVal = (($('#pPlace') || {}).value || '').trim();
+  const hasLoc = draft.lat != null || placeVal.length > 0;
+
+  const needsName = !db.user || !db.user.trim();
+  const nameVal = (($('#pName') || {}).value || '').trim();
+  const hasName = !needsName || nameVal.length > 0;
+
+  const required = needsName ? 3 : 2;
+  const fillCount = (hasDesc ? 1 : 0) + (hasLoc ? 1 : 0) + (needsName ? (hasName ? 1 : 0) : 0);
+
+  const btn = $('#postSave');
+  if (!btn) return;
+  btn.disabled = fillCount < required;
+  btn.classList.toggle('fill-half', fillCount > 0 && fillCount < required);
+  btn.classList.toggle('fill-full', fillCount === required);
+  btn.style.backgroundPosition = fillCount === required
+    ? ''
+    : (100 - (fillCount / required) * 100) + '% 50%';
+}
+
+function doPost() {
+  const descInput = $('#pDesc');
+  if (!descInput) return;
+  const desc = descInput.value.trim().slice(0, MAX_LENGTH);
+  if (!db.posts) db.posts = [];
+  db.posts.push({
+    id: genId(),
+    user: db.user,
+    desc,
+    img: draft.img,
+    lat: draft.lat,
+    lng: draft.lng,
+    place: draft.place,
+    ts: Date.now(),
+    reacts: {},
+    comments: []
+  });
+  hide('#postSheet');
+  refresh();
+  showToast('Spot added!');
+}
+
+const GEO_DETECT_SVG = '<svg viewBox="0 0 20 20" fill="none" width="15" height="15"><circle cx="10" cy="10" r="3.5" stroke="currentColor" stroke-width="1.5"/><path d="M10 1.5v3M10 15.5v3M1.5 10h3M15.5 10h3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>';
+
+function showLocationPicker() {
+  const picker = $('#locationPicker');
   const bar = $('#geoBar');
-  if (bar) bar.className = 'geobar ' + state;
+  const detectBtn = $('#geoDetect');
+  if (picker) { picker.hidden = false; picker.style.display = 'flex'; }
+  if (bar) { bar.hidden = true; bar.style.display = 'none'; }
+  if (detectBtn) { detectBtn.innerHTML = GEO_DETECT_SVG; detectBtn.disabled = false; }
+}
+
+function confirmGeo(text) {
+  const picker = $('#locationPicker');
+  const bar = $('#geoBar');
+  if (picker) { picker.hidden = true; picker.style.display = 'none'; }
+  if (bar) { bar.hidden = false; bar.style.display = 'flex'; bar.className = 'geobar ok'; }
   const textEl = $('#geoText');
   if (textEl) textEl.textContent = text;
 }
 
 function useCoords(lat, lng, from) {
   draft.lat = lat; draft.lng = lng;
-  setGeo('ok', `${lat.toFixed(4)}, ${lng.toFixed(4)} · from ${from}`);
-}
-
-function askDevice() {
-  if (!navigator.geolocation) return setGeo('warn', 'No location support — add the address instead.');
-  setGeo('', 'Locating…');
-  navigator.geolocation.getCurrentPosition(
-    pos => { if (draft.lat == null) useCoords(+pos.coords.latitude.toFixed(6), +pos.coords.longitude.toFixed(6), 'your device'); },
-    () => { if (draft.lat == null) setGeo('warn', 'Location off — add a photo or the address.'); },
-    { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
-  );
+  confirmGeo(`${lat.toFixed(4)}, ${lng.toFixed(4)} · from ${from}`);
+  validatePost();
 }
 
 $('#btnNew').onclick = () => {
-  if (!requireUser()) return;
   draft = { img: null, lat: null, lng: null, place: '' };
   const desc = $('#pDesc');
   const place = $('#pPlace');
+  const fileInput = $('#pImg');
   if (desc) desc.value = '';
   if (place) place.value = '';
+  if (fileInput) fileInput.value = '';
   updateDescCounter();
-  const prev = $('#pPrev');
-  const cta = $('#dropCta');
-  if (prev) prev.hidden = true;
-  if (cta) cta.hidden = false;
-  const manual = $('#manualRow');
-  if (manual) manual.hidden = true;
+  clearPhoto();
+
+  // Ask for a username inline when we don't have one yet
+  const namePicker = $('#namePicker');
+  const nameField = $('#pName');
+  const needsName = !db.user || !db.user.trim();
+  if (namePicker) {
+    namePicker.hidden = !needsName;
+    namePicker.style.display = needsName ? 'flex' : 'none';
+  }
+  if (nameField) nameField.value = needsName ? '' : db.user;
+
+  showLocationPicker();
+  validatePost();
   show('#postSheet');
-  askDevice();
+  setTimeout(() => {
+    const first = (!db.user || !db.user.trim()) ? $('#pName') : $('#pDesc');
+    if (first) first.focus();
+  }, 350);
 };
 
 $('#postCancel').onclick = () => hide('#postSheet');
-
-$('#geoManual').onclick = () => { 
-  const manual = $('#manualRow');
-  if (manual) manual.hidden = false; 
-  const place = $('#pPlace');
-  if (place) place.focus(); 
-};
 
 function updateDescCounter() {
   const input = $('#pDesc');
@@ -960,13 +1030,62 @@ function updateDescCounter() {
 }
 
 if ($('#pDesc')) {
-  $('#pDesc').oninput = updateDescCounter;
+  $('#pDesc').oninput = () => { updateDescCounter(); validatePost(); };
 }
 
 if ($('#pPlace')) {
-  $('#pPlace').oninput = e => {
-    draft.place = e.target.value.trim();
-    if (draft.lat == null) setGeo(draft.place ? 'ok' : 'warn', draft.place || 'Location off — add a photo or the address.');
+  $('#pPlace').oninput = e => { draft.place = e.target.value.trim(); validatePost(); };
+}
+
+if ($('#pName')) {
+  $('#pName').oninput = () => validatePost();
+}
+
+if ($('#geoDetect')) {
+  $('#geoDetect').onclick = () => {
+    const btn = $('#geoDetect');
+    if (!navigator.geolocation) {
+      showToast('Location not available on this device');
+      return;
+    }
+    if (btn) { btn.innerHTML = '<svg viewBox="0 0 20 20" fill="none" width="15" height="15"><circle cx="10" cy="10" r="3.5" stroke="var(--orange)" stroke-width="1.5"/><path d="M10 1.5v3M10 15.5v3M1.5 10h3M15.5 10h3" stroke="var(--orange)" stroke-width="1.5" stroke-linecap="round"/></svg>'; btn.disabled = true; }
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        if (btn) btn.disabled = false;
+        useCoords(+pos.coords.latitude.toFixed(6), +pos.coords.longitude.toFixed(6), 'your device');
+      },
+      () => {
+        if (btn) { btn.innerHTML = '<svg viewBox="0 0 20 20" fill="none" width="15" height="15"><circle cx="10" cy="10" r="3.5" stroke="currentColor" stroke-width="1.5"/><path d="M10 1.5v3M10 15.5v3M1.5 10h3M15.5 10h3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>'; btn.disabled = false; }
+        showToast('Location access denied or unavailable');
+      },
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
+    );
+  };
+}
+
+if ($('#geoChange')) {
+  $('#geoChange').onclick = () => {
+    draft.lat = null; draft.lng = null;
+    showLocationPicker();
+    validatePost();
+  };
+}
+
+function clearPhoto() {
+  draft.img = null;
+  const fileInput = $('#pImg');
+  const chosen = $('#photoChosen');
+  const cta = $('#dropCta');
+  if (fileInput) fileInput.value = '';
+  if (chosen) chosen.hidden = true;
+  if (cta) cta.hidden = false;
+}
+
+if ($('#photoRemove')) {
+  $('#photoRemove').onclick = e => {
+    e.preventDefault();
+    e.stopPropagation();
+    clearPhoto();
   };
 }
 
@@ -976,47 +1095,32 @@ if ($('#pImg')) {
     if (!f) return;
     draft.img = await shrink(f);
     const prev = $('#pPrev');
+    const chosen = $('#photoChosen');
     const cta = $('#dropCta');
-    if (prev) { prev.src = draft.img; prev.hidden = false; }
+    if (prev) prev.src = draft.img;
+    if (chosen) chosen.hidden = false;
     if (cta) cta.hidden = true;
 
     let gps = null;
     try { gps = exifGPS(await f.arrayBuffer()); } catch {}
     if (gps) useCoords(gps.lat, gps.lng, 'the photo');
-    else if (draft.lat == null) setGeo('warn', 'No GPS in that photo — enter it manually.');
+    // No GPS in photo — locationPicker stays visible for manual/detect
   };
 }
 
 $('#postSave').onclick = () => {
-  const descInput = $('#pDesc');
-  if (!descInput) return;
-  const desc = descInput.value.trim().slice(0, MAX_LENGTH);
-  if (!desc) {
-    showToast('Please enter a description');
-    descInput.focus();
-    return;
+  if (!db.user || !db.user.trim()) {
+    const nameField = $('#pName');
+    const name = nameField ? nameField.value.trim() : '';
+    if (!name) {
+      showToast('Add your name first');
+      if (nameField) nameField.focus();
+      return;
+    }
+    db.user = name;
+    save();
   }
-  if (desc.length > MAX_LENGTH) {
-    showToast('Description too long! Max ' + MAX_LENGTH + ' characters');
-    return;
-  }
-  
-  if (!db.posts) db.posts = [];
-  db.posts.push({
-    id: genId(),
-    user: db.user, 
-    desc, 
-    img: draft.img,
-    lat: draft.lat, 
-    lng: draft.lng, 
-    place: draft.place,
-    ts: Date.now(), 
-    reacts: {}, 
-    comments: []
-  });
-  hide('#postSheet'); 
-  refresh();
-  showToast('Spot added!');
+  doPost();
 };
 
 /* ---------- SHARING ---------- */
@@ -1070,6 +1174,14 @@ function hideShareModal() {
     modal.hidden = true;
     modal.style.display = 'none';
   }, 300);
+}
+
+// Sync pill
+if ($('#syncPill')) {
+  $('#syncPill').onclick = showSyncSheet;
+}
+if ($('#syncClose')) {
+  $('#syncClose').onclick = hideSyncSheet;
 }
 
 // Share buttons
@@ -1182,6 +1294,150 @@ function showToast(msg) {
   }, 2000);
 }
 
+/* ---------- SYNC PILL & SHEET ---------- */
+function updateSyncPill() {
+  const pill = $('#syncPill');
+  if (!pill) return;
+  try {
+    const raw = store.getItem(MERGE_HISTORY_KEY);
+    if (!raw) { pill.style.display = 'none'; return; }
+    const hist = JSON.parse(raw);
+    if (!hist || hist.length === 0) { pill.style.display = 'none'; return; }
+    pill.textContent = '⟳ ' + ago(hist[0].ts);
+    pill.style.display = 'flex';
+  } catch(e) {
+    pill.style.display = 'none';
+  }
+}
+
+function buildMergeGraph(hist) {
+  if (!hist || hist.length === 0) return '';
+
+  const ROW_H = 44;
+  const PAD_V = 20;
+  const MAIN_X = 148;
+  const W = 220;
+
+  // Unique from-users in order of first appearance (newest first = top)
+  const fromUsers = [];
+  hist.forEach(m => {
+    if (m.from && !fromUsers.includes(m.from)) fromUsers.push(m.from);
+  });
+
+  // X position per from-user, spread left of main branch
+  const spread = fromUsers.length > 1
+    ? Math.min(40, (MAIN_X - 28) / fromUsers.length)
+    : MAIN_X - 40;
+  const userX = {};
+  fromUsers.forEach((u, i) => { userX[u] = 20 + i * spread; });
+
+  // Layout: row 0 = "you now" at top, row i+1 = hist[i]
+  const H = PAD_V + (hist.length + 1) * ROW_H + PAD_V;
+  const youY = PAD_V;
+  const rowY = i => PAD_V + (i + 1) * ROW_H;
+
+  let s = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">`;
+
+  // Main branch vertical line
+  s += `<line x1="${MAIN_X}" y1="${youY}" x2="${MAIN_X}" y2="${rowY(hist.length - 1)}" stroke="#dfe3e8" stroke-width="2"/>`;
+
+  // Per from-user: vertical branch line spanning their appearances
+  fromUsers.forEach(u => {
+    const ys = hist.map((m, i) => m.from === u ? rowY(i) : null).filter(y => y !== null);
+    if (ys.length < 2) return;
+    s += `<line x1="${userX[u]}" y1="${ys[0]}" x2="${userX[u]}" y2="${ys[ys.length - 1]}" stroke="${colorFor(u)}" stroke-width="2" opacity="0.3"/>`;
+  });
+
+  // Merge events (hist[0] = latest = top)
+  hist.forEach((m, i) => {
+    const y = rowY(i);
+    const col = m.from ? colorFor(m.from) : '#8b939d';
+    const fx = m.from ? userX[m.from] : MAIN_X - 36;
+
+    // Bezier connector from from-user to main branch
+    if (m.from && fx !== MAIN_X) {
+      const mid = (fx + MAIN_X) / 2;
+      s += `<path d="M${fx},${y} C${mid},${y} ${mid},${y} ${MAIN_X},${y}" fill="none" stroke="${col}" stroke-width="1.5" opacity="0.45"/>`;
+    }
+
+    // From-user dot with initial
+    if (m.from) {
+      s += `<circle cx="${fx}" cy="${y}" r="9" fill="${col}"/>`;
+      s += `<text x="${fx}" y="${y + 4.5}" text-anchor="middle" font-size="8" font-weight="700" fill="#fff">${m.from.charAt(0).toUpperCase()}</text>`;
+    }
+
+    // Merge dot on main branch
+    s += `<circle cx="${MAIN_X}" cy="${y}" r="5" fill="${col}" stroke="#fff" stroke-width="2"/>`;
+
+    // Time label right of main branch
+    s += `<text x="${MAIN_X + 12}" y="${y + 4}" font-size="9" fill="#8b939d">${ago(m.ts)}</text>`;
+  });
+
+  // "You now" dot at top
+  const meCol = db.user ? colorFor(db.user) : '#8b939d';
+  s += `<circle cx="${MAIN_X}" cy="${youY}" r="9" fill="${meCol}"/>`;
+  s += `<text x="${MAIN_X}" y="${youY + 4.5}" text-anchor="middle" font-size="8" font-weight="700" fill="#fff">${(db.user || '?').charAt(0).toUpperCase()}</text>`;
+  s += `<text x="${MAIN_X + 14}" y="${youY + 4.5}" font-size="9" fill="${meCol}" font-weight="600">now</text>`;
+
+  s += '</svg>';
+  return s;
+}
+
+function showSyncSheet() {
+  const sheet = $('#syncSheet');
+  if (!sheet) return;
+
+  try {
+    const raw = store.getItem(MERGE_HISTORY_KEY);
+    const hist = raw ? JSON.parse(raw) : [];
+    const latest = hist[0];
+
+    const timeEl = $('#syncTime');
+    if (timeEl && latest) {
+      const d = new Date(latest.ts);
+      timeEl.textContent =
+        d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) +
+        ' · ' +
+        d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    }
+
+    const fromEl = $('#syncFrom');
+    if (fromEl) {
+      fromEl.innerHTML = '';
+      const name = (latest && latest.from) || 'Unknown';
+      fromEl.append(avatar(name, true));
+      fromEl.append(el('span', null, name));
+    }
+
+    const statsEl = $('#syncStats');
+    if (statsEl && latest) {
+      const parts = [latest.totalPosts + ' spot' + (latest.totalPosts !== 1 ? 's' : '')];
+      if (latest.newPosts > 0) parts.push('+' + latest.newPosts + ' new');
+      if (latest.postsMerged > 0) parts.push(latest.postsMerged + ' merged');
+      statsEl.textContent = parts.join(' · ');
+    }
+
+    const graphEl = $('#syncGraph');
+    if (graphEl) graphEl.innerHTML = buildMergeGraph(hist);
+
+  } catch(e) {
+    console.warn('syncSheet render failed:', e);
+  }
+
+  sheet.hidden = false;
+  sheet.style.display = 'flex';
+  sheet.style.opacity = '1';
+  sheet.style.pointerEvents = 'auto';
+  setTimeout(() => sheet.classList.add('visible'), 10);
+}
+
+function hideSyncSheet() {
+  const sheet = $('#syncSheet');
+  if (!sheet) return;
+  sheet.classList.remove('visible');
+  setTimeout(() => { sheet.hidden = true; sheet.style.display = 'none'; }, 300);
+}
+
 /* ---------- MERGE HANDLING ---------- */
 function checkForMerge() {
   try {
@@ -1204,132 +1460,12 @@ function checkForMerge() {
       }
     }
     
-    const sharedData = loadSharedState();
-    if (sharedData && db && db.posts && db.posts.length > 0) {
-      showMergePrompt();
-    }
   } catch(e) {
     console.warn('Merge check failed:', e);
   }
 }
 
-function showMergePrompt() {
-  let existing = false;
-  try {
-    const stored = store.getItem(KEY);
-    if (stored) {
-      const d = JSON.parse(stored);
-      if (d && d.posts && d.posts.length > 0) existing = true;
-    }
-  } catch(e) {}
-  
-  if (!existing) return;
-  
-  const mergeBtn = $('#btnMerge');
-  if (mergeBtn) {
-    mergeBtn.style.display = 'flex';
-    mergeBtn.innerHTML = '🔄 Merge';
-    mergeBtn.title = 'Merge shared data with your existing spots';
-    mergeBtn.onclick = () => {
-      const shared = loadSharedState();
-      if (shared) {
-        const merged = mergeStates(shared);
-        if (merged) {
-          db = merged;
-          save();
-          render();
-          mergeBtn.style.display = 'none';
-          showToast('Merged successfully!');
-        }
-      }
-    };
-  }
-}
 
-/* ---------- Leave detection ---------- */
-let leaveWarningEnabled = true;
-
-try {
-  const dontAsk = store.getItem(DONT_ASK_KEY);
-  if (dontAsk === 'true') {
-    leaveWarningEnabled = false;
-  }
-} catch(e) {}
-
-window.addEventListener('beforeunload', (e) => {
-  if (!leaveWarningEnabled) return;
-  if (!hasChanges) return;
-  if (!db || db._shared) return;
-  if (!db.posts || db.posts.length === 0) return;
-  
-  e.preventDefault();
-  e.returnValue = '';
-  showLeaveModal();
-  return '';
-});
-
-function showLeaveModal() {
-  const modal = $('#leaveModal');
-  if (!modal) return;
-  modal.hidden = false;
-  modal.style.display = 'flex';
-  modal.style.opacity = '1';
-  modal.style.pointerEvents = 'auto';
-  const checkbox = $('#leaveDontAsk');
-  if (checkbox) checkbox.checked = false;
-  setTimeout(() => modal.classList.add('visible'), 10);
-}
-
-function hideLeaveModal() {
-  const modal = $('#leaveModal');
-  if (!modal) return;
-  modal.classList.remove('visible');
-  setTimeout(() => {
-    modal.hidden = true;
-    modal.style.display = 'none';
-  }, 300);
-}
-
-function handleLeaveClose() {
-  const checkbox = $('#leaveDontAsk');
-  if (checkbox && checkbox.checked) {
-    leaveWarningEnabled = false;
-    try {
-      store.setItem(DONT_ASK_KEY, 'true');
-    } catch(e) {}
-  }
-  hideLeaveModal();
-}
-
-if ($('#leaveCancel')) $('#leaveCancel').onclick = handleLeaveClose;
-if ($('#leaveClose')) $('#leaveClose').onclick = handleLeaveClose;
-
-if ($('#leaveShare')) {
-  $('#leaveShare').onclick = () => {
-    const checkbox = $('#leaveDontAsk');
-    if (checkbox && checkbox.checked) {
-      leaveWarningEnabled = false;
-      try {
-        store.setItem(DONT_ASK_KEY, 'true');
-      } catch(e) {}
-    }
-    hideLeaveModal();
-    showShareModal();
-  };
-}
-
-if ($('#shareDontAsk')) {
-  $('#shareDontAsk').onchange = function() {
-    leaveWarningEnabled = !this.checked;
-    try {
-      store.setItem(DONT_ASK_KEY, String(!this.checked));
-    } catch(e) {}
-  };
-}
-
-setTimeout(() => {
-  hasChanges = false;
-}, 100);
 
 /* ---------- seed ---------- */
 function seed() {
@@ -1337,7 +1473,7 @@ function seed() {
   const h = 3600e3;
   return [
     { 
-      id: (now - 26 * h).toString(36) + 'a1', 
+      id: '_seed01',
       user: 'Jussi', 
       desc: 'Calm bay at Seurasaari, sandy bottom, easy entry.',
       img: null, 
@@ -1348,14 +1484,14 @@ function seed() {
       reacts: { '🌊': ['Martti', 'Laura P.'], '🏊': ['Laura P.'] },
       comments: [
         { 
-          id: (now - 20 * h).toString(36) + 'c1',
+          id: '_seedc01',
           user: 'Martti', 
           text: 'Went yesterday — 17°C, perfect.', 
           ts: now - 20 * h, 
           reacts: { '👏': ['Jussi'] } 
         },
         { 
-          id: (now - 5 * h).toString(36) + 'c2',
+          id: '_seedc02',
           user: 'Laura P.', 
           text: 'Parking fills up before 9.', 
           ts: now - 5 * h, 
@@ -1364,7 +1500,7 @@ function seed() {
       ] 
     },
     { 
-      id: (now - 9 * h).toString(36) + 'a2',
+      id: '_seed02',
       user: 'Laura P.', 
       desc: 'Deep off the Vuosaari pier. Ladder stays in winter.',
       img: null, 
@@ -1374,7 +1510,7 @@ function seed() {
       ts: now - 9 * h,
       reacts: { '❄️': ['Jussi', 'Martti'] },
       comments: [{ 
-        id: (now - 2 * h).toString(36) + 'c3',
+        id: '_seedc03',
         user: 'Jussi', 
         text: 'Ice hole kept open all January.', 
         ts: now - 2 * h, 
@@ -1382,7 +1518,7 @@ function seed() {
       }] 
     },
     { 
-      id: (now - 40 * 60e3).toString(36) + 'a3',
+      id: '_seed03',
       user: 'Martti', 
       desc: 'Pikku Kallahti — shallow, warm, good for a long swim.',
       img: null, 
@@ -1412,6 +1548,39 @@ function debugStorage() {
   console.log('=== END DEBUG ===');
 }
 
+/* ---------- Clear data ---------- */
+function clearAppData() {
+  try {
+    Object.keys(localStorage)
+      .filter(k => k.startsWith('water.'))
+      .forEach(k => localStorage.removeItem(k));
+  } catch(e) {}
+  window.location.href = window.location.pathname;
+}
+
+function showClearConfirm() {
+  const wrap = $('#clearDataWrap');
+  if (!wrap) return;
+  wrap.innerHTML = `
+    <p class="danger-confirm">This will delete all your spots and settings.</p>
+    <div class="row end" style="margin-top:8px">
+      <button class="ghost" id="clearCancel">Cancel</button>
+      <button class="danger-btn" id="clearConfirm">Delete everything</button>
+    </div>`;
+  if ($('#clearCancel')) $('#clearCancel').onclick = resetClearBtn;
+  if ($('#clearConfirm')) $('#clearConfirm').onclick = clearAppData;
+}
+
+function resetClearBtn() {
+  const wrap = $('#clearDataWrap');
+  if (!wrap) return;
+  wrap.innerHTML = '<button class="ghost-danger" id="clearDataBtn">Clear all data</button>';
+  if ($('#clearDataBtn')) $('#clearDataBtn').onclick = showClearConfirm;
+}
+
+if ($('#clearDataBtn')) $('#clearDataBtn').onclick = showClearConfirm;
+if ($('#appVersion')) $('#appVersion').textContent = 'v' + VERSION;
+
 /* ---------- go ---------- */
 console.log('Initializing water.io...');
 
@@ -1439,25 +1608,12 @@ if (db._shared) {
   if (top) top.append(indicator);
 }
 
-// Reset hasChanges after initial load
-setTimeout(() => {
-  hasChanges = false;
-}, 200);
-
 // Debug after load
 setTimeout(debugStorage, 500);
 
 // Make debug functions available globally
 window.debugStorage = debugStorage;
 window.requireUser = requireUser;
-
-// FORCE SHOW NAME SHEET IF NO USER
-if (!db.user || db.user.trim() === '') {
-  console.log('No user found on startup, showing name sheet');
-  setTimeout(() => {
-    requireUser();
-  }, 500);
-}
 
 console.log('water.io ready!');
 

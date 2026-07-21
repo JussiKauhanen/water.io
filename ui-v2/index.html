@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>water.io — v2</title>
+<link rel="stylesheet" href="style.css">
+<script src="https://cdn.jsdelivr.net/npm/lz-string@1.5.0/lz-string.min.js"></script>
+</head>
+<body>
+
+<div class="stage">
+  <div class="phone">
+    <div class="notch"></div>
+
+    <!-- ============ HOME ============ -->
+    <section class="view view-home" id="viewHome">
+      <div class="hero">
+        <div class="blob blob-a"></div>
+        <div class="blob blob-b"></div>
+
+        <header class="hero-top">
+          <button class="me-chip" id="btnMe">
+            <span class="av av-lg" id="meAv">?</span>
+            <span class="me-text">
+              <em id="greeting">Good morning</em>
+              <b id="meName">Swimmer</b>
+            </span>
+          </button>
+          <div class="hero-actions">
+            <button class="round round-ghost" id="btnSearch" aria-label="Search">
+              <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+                <circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/>
+              </svg>
+            </button>
+            <button class="round round-ghost" id="btnShare" aria-label="Share">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
+                <path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/>
+              </svg>
+            </button>
+            <button class="round round-accent" id="btnNew" aria-label="New spot">
+              <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round">
+                <path d="M12 5v14M5 12h14"/>
+              </svg>
+            </button>
+          </div>
+        </header>
+
+        <div class="search-wrap" id="searchWrap" hidden>
+          <input id="searchInput" placeholder="Search spots, places, people" autocomplete="off">
+          <button class="search-x" id="searchClear" aria-label="Clear search">×</button>
+        </div>
+
+        <div class="stories" id="stories"></div>
+      </div>
+
+      <div class="sheet-panel">
+        <div class="panel-grip"></div>
+        <div class="panel-head">
+          <h2>Spots</h2>
+          <button class="manage" id="btnManage">Manage</button>
+        </div>
+        <div class="rows" id="rows"></div>
+      </div>
+    </section>
+
+    <!-- ============ THREAD ============ -->
+    <section class="view view-thread" id="viewThread" hidden>
+      <header class="thread-top">
+        <button class="back" id="btnBack" aria-label="Back">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M15 5l-7 7 7 7"/>
+          </svg>
+        </button>
+        <span class="av av-md" id="threadAv"></span>
+        <div class="thread-id">
+          <b id="threadTitle"></b>
+          <em id="threadSub"></em>
+        </div>
+        <button class="thread-more" id="btnThreadShare" aria-label="Share spot">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
+            <path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/>
+          </svg>
+        </button>
+      </header>
+
+      <div class="thread-body" id="threadBody"></div>
+
+      <div class="composer">
+        <input id="cmInput" maxlength="50" placeholder="Message" autocomplete="off">
+        <span class="cm-count" id="cmCount">0/50</span>
+        <button class="cm-send" id="cmSend" aria-label="Send reply">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M2 20.5c2.6.7 4.6-.3 4.6-1.9 0-1-1.2-1.5-1.9-.8-.8.8-.1 2.3 1.5 2.9 1.6.6 3.4.2 4.6-.9"
+                  stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            <path d="M21.4 2.6 9.9 13.2m11.5-10.6-6.6 18.2-3.6-7.6-7.6-3.6 17.8-7z"
+                  stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" fill="currentColor" fill-opacity=".15"/>
+          </svg>
+        </button>
+      </div>
+    </section>
+  </div>
+</div>
+
+<!-- ============ NEW SPOT ============ -->
+<div class="scrim" id="postSheet" hidden>
+  <div class="modal">
+    <div class="grip"></div>
+    <div class="modal-head">
+      <h2>New spot</h2>
+      <button class="x" id="postCancel" aria-label="Close">×</button>
+    </div>
+
+    <div class="mfield" id="namePicker" hidden>
+      <span class="mfield-ico">
+        <svg viewBox="0 0 20 20" fill="none" width="18" height="18">
+          <circle cx="10" cy="6.5" r="3.25" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M3.5 17c0-3.3 2.9-5.5 6.5-5.5s6.5 2.2 6.5 5.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+      </span>
+      <div class="mfield-body">
+        <input id="pName" maxlength="20" placeholder="Your name — shown on the spot" autocomplete="off">
+      </div>
+    </div>
+
+    <div class="mfield">
+      <span class="mfield-ico">
+        <svg viewBox="0 0 20 20" fill="none" width="18" height="18">
+          <rect x="3" y="2" width="14" height="16" rx="2.5" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M6.5 7.5h7M6.5 11h5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+      </span>
+      <div class="mfield-body">
+        <textarea id="pDesc" maxlength="50" rows="2" placeholder="Describe the spot in a few words"></textarea>
+        <div class="count" id="descCount">0/50</div>
+      </div>
+    </div>
+
+    <div class="mfield" id="locationPicker">
+      <span class="mfield-ico">
+        <svg viewBox="0 0 20 20" fill="none" width="18" height="18">
+          <path d="M10 1.5A5.5 5.5 0 004.5 7C4.5 11 10 18.5 10 18.5S15.5 11 15.5 7A5.5 5.5 0 0010 1.5z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+          <circle cx="10" cy="7" r="2" stroke="currentColor" stroke-width="1.5"/>
+        </svg>
+      </span>
+      <div class="mfield-body loc-row">
+        <input id="pPlace" maxlength="80" placeholder="e.g. Kaitalampi, Espoo">
+        <button type="button" id="geoDetect" class="geo-btn" title="Detect my location">
+          <svg viewBox="0 0 20 20" fill="none" width="15" height="15">
+            <circle cx="10" cy="10" r="3.5" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M10 1.5v3M10 15.5v3M1.5 10h3M15.5 10h3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <label class="photo-add">
+      <input type="file" id="pImg" accept="image/*" hidden>
+      <span class="photo-cta" id="photoCta">
+        <svg viewBox="0 0 20 20" fill="none" width="14" height="14">
+          <rect x="2.5" y="4.5" width="15" height="11" rx="2.5" stroke="currentColor" stroke-width="1.5"/>
+          <circle cx="10" cy="10" r="2.75" stroke="currentColor" stroke-width="1.5"/>
+        </svg>
+        Add photo <em>optional</em>
+      </span>
+      <span class="photo-chosen" id="photoChosen" hidden>
+        <img class="preview" id="pPrev" alt="">
+        <span class="photo-chosen-label">Photo attached</span>
+        <button type="button" class="photo-remove" id="photoRemove" aria-label="Remove photo">×</button>
+      </span>
+    </label>
+
+    <div class="geobar" id="geoBar" hidden>
+      <span class="dot"></span>
+      <span id="geoText"></span>
+      <button class="link" id="geoChange">change</button>
+    </div>
+
+    <button class="cta" id="postSave" disabled>Post spot</button>
+  </div>
+</div>
+
+<!-- ============ SHARE ============ -->
+<div class="scrim" id="shareSheet" hidden>
+  <div class="modal">
+    <div class="grip"></div>
+    <div class="modal-head">
+      <h2 id="shareTitle">Share</h2>
+      <button class="x" id="shareClose" aria-label="Close">×</button>
+    </div>
+
+    <div class="share-stats">
+      <span class="share-count" id="shareCount">0 spots</span>
+      <span class="share-time" id="shareTime"></span>
+    </div>
+
+    <div class="share-box">
+      <input type="text" id="shareUrl" readonly onclick="this.select()">
+      <button class="copy-btn" id="shareCopy" title="Copy link">
+        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="9" y="9" width="13" height="13" rx="2"/>
+          <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
+        </svg>
+      </button>
+    </div>
+    <p class="share-note" id="shareNote"></p>
+
+    <div class="share-divider"></div>
+
+    <div class="share-options">
+      <button class="share-option" data-share="copy">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#6b7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="9" y="9" width="13" height="13" rx="2"/>
+          <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
+        </svg>
+        <span>Copy</span>
+      </button>
+      <button class="share-option" data-share="whatsapp">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="#25D366">
+          <path d="M12.032 21.965c-1.92 0-3.78-.54-5.34-1.56l-4.29 1.36 1.37-4.22c-1.08-1.62-1.66-3.52-1.66-5.5 0-5.52 4.48-10 10-10s10 4.48 10 10-4.48 10-10 10zm0-18.96c-4.96 0-8.99 4.03-8.99 8.99 0 1.74.52 3.44 1.48 4.88l-.98 3.03 3.13-.99c1.4.84 3.02 1.31 4.73 1.31 4.96 0 8.99-4.03 8.99-8.99s-4.04-8.99-9-8.99zm5.48 7.23c-.3-.15-1.78-.88-2.06-.98-.28-.1-.49-.15-.7.15s-.81.98-.99 1.18c-.18.2-.36.22-.66.07-.3-.15-1.27-.47-2.42-1.49-.89-.8-1.5-1.78-1.67-2.08-.18-.3-.02-.46.13-.61.14-.14.3-.36.45-.54.15-.18.2-.3.3-.5.1-.2.05-.38-.03-.52-.08-.14-.7-1.68-.96-2.3-.25-.6-.51-.52-.7-.53-.18-.01-.38-.01-.58-.01-.2 0-.52.08-.8.38-.28.3-1.07 1.04-1.07 2.54 0 1.5 1.09 2.95 1.24 3.15.15.2 2.14 3.27 5.18 4.59.72.31 1.29.5 1.73.64.73.24 1.39.2 1.91.12.58-.09 1.78-.73 2.03-1.43.25-.7.25-1.3.17-1.43-.08-.13-.28-.21-.58-.36z"/>
+        </svg>
+        <span>WhatsApp</span>
+      </button>
+      <button class="share-option" data-share="telegram">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="#29a9eb">
+          <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.568 8.16l-1.86 8.77c-.14.62-.51.77-1.03.48l-2.85-2.1-1.37 1.32c-.15.15-.28.28-.58.28l.2-2.93 5.34-4.82c.23-.2-.05-.32-.36-.12l-6.6 4.16-2.84-.89c-.62-.19-.63-.62.13-.92l11.1-4.28c.51-.19.96.12.79.87z"/>
+        </svg>
+        <span>Telegram</span>
+      </button>
+      <button class="share-option" data-share="native">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#6b7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
+          <path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/>
+        </svg>
+        <span>More</span>
+      </button>
+    </div>
+
+    <div class="share-options" style="margin-top:6px">
+      <button class="share-option" data-share="email">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#6b7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="2.5" y="4.5" width="19" height="15" rx="2.5"/><path d="M3 6.5l9 6 9-6"/>
+        </svg>
+        <span>Email</span>
+      </button>
+      <button class="share-option" data-share="sms">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#6b7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 11.5a8.4 8.4 0 01-9 8.4 9.3 9.3 0 01-3.9-.8L3 20.5l1.5-4.4A8.3 8.3 0 013.5 11.5a8.4 8.4 0 018.5-8.4 8.4 8.4 0 019 8.4z"/>
+        </svg>
+        <span>Message</span>
+      </button>
+      <button class="share-option" data-share="facebook">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="#1877f2">
+          <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+        </svg>
+        <span>Facebook</span>
+      </button>
+      <button class="share-option" data-share="qr">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#6b7280" stroke-width="2" stroke-linejoin="round">
+          <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+          <rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM20 14h1M14 20h3M20 19v2"/>
+        </svg>
+        <span>QR code</span>
+      </button>
+    </div>
+
+    <div class="share-qr" id="shareQr" hidden style="margin-top:14px;text-align:center"></div>
+  </div>
+</div>
+
+<!-- ============ MANAGE / PROFILE ============ -->
+<div class="scrim" id="manageSheet" hidden>
+  <div class="modal">
+    <div class="grip"></div>
+    <div class="modal-head">
+      <h2>Manage</h2>
+      <button class="x" id="manageClose" aria-label="Close">×</button>
+    </div>
+
+    <div class="mfield">
+      <span class="mfield-ico">
+        <svg viewBox="0 0 20 20" fill="none" width="18" height="18">
+          <circle cx="10" cy="6.5" r="3.25" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M3.5 17c0-3.3 2.9-5.5 6.5-5.5s6.5 2.2 6.5 5.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+      </span>
+      <div class="mfield-body">
+        <input id="mgName" maxlength="20" placeholder="Your name" autocomplete="off">
+      </div>
+    </div>
+
+    <button class="cta-solid" id="mgSave">Save</button>
+    <button class="cta-ghost" id="mgShare">Share these spots</button>
+    <button class="cta-ghost" id="mgReadAll">Mark everything read</button>
+    <button class="cta-danger" id="mgClear">Clear all data</button>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
