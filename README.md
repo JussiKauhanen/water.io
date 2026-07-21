@@ -19,21 +19,21 @@
 
 | Feed | New Spot | Share Modal |
 |------|----------|-------------|
-| ![Feed](screenshots/feed.png) | ![New Spot](screenshots/new-spot.png) | ![Share](screenshots/share.png) |
+| ![Feed](screenshots/feed.png) | ![New Spot](screenshots/new-spot.png)|
 
 | Reactions | Merge | Comments |
 |-----------|-------|----------|
-| ![Reactions](screenshots/reactions.png) | ![Merge](screenshots/merge.png) | ![Comments](screenshots/comments.png) |
+| ![Comments](screenshots/comments.png) |
 
 ## Quick Start
 
 ### Try it live
-[https://yourusername.github.io/water.io](https://yourusername.github.io/water.io)
+[https://jussikauhanen.github.io/water.io/](https://jussikauhanen.github.io/water.io/)
 
 ### Run locally
 ```bash
 # Clone the repo
-git clone https://github.com/yourusername/water.io.git
+git clone https://github.com/jussikauhanen/water.io.git
 
 # Open in browser
 cd water.io
