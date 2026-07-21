@@ -9,6 +9,7 @@ const IMAGE_PREFIX = 'water.img.';
 const LAST_MODIFIED_KEY = 'water.io.modified';
 const SYNC_KEY = 'water.io.sync';
 const MERGE_HISTORY_KEY = 'water.io.merges';
+const SEEN_KEY = 'water.io.seen';   // { [postId]: commentsSeenCount }
 const EMOJI = ['🏊', '🌊', '❄️', '🔥', '👏'];
 const COLORS = ['#ffd84d','#f78fc2','#3b5bfd','#3ed598','#b28dff','#ff8a5c','#2fd4e8','#ff5f8d'];
 const MAX_LENGTH = 50;
@@ -26,6 +27,11 @@ const persists = store === localStorage;
 
 let db = null;
 let lastModified = parseInt(store.getItem(LAST_MODIFIED_KEY)) || Date.now();
+let openPostId = null;
+let importedIds = new Set();      // post IDs that arrived via the current share URL
+let importBannerDismissed = false;
+let flashPostId = null;           // ID of the just-posted spot (gets the flash animation)
+let flashCommentId = null;        // ID of the just-sent comment (gets the flash animation)
 
 /* ---------- ID Generation ---------- */
 function genId() {
@@ -203,6 +209,7 @@ function mergeStates(sharedData) {
     } else {
       postMap.set(p.id, p);
       newPostsAdded++;
+      importedIds.add(p.id);   // track for WhatsApp-style unread badge
     }
   });
 
@@ -252,13 +259,7 @@ function mergeStates(sharedData) {
     console.warn('Failed to save merged data:', e);
   }
 
-  setTimeout(() => {
-    const parts = [];
-    if (newPostsAdded > 0) parts.push(`${newPostsAdded} post${newPostsAdded > 1 ? 's' : ''} added`);
-    if (newComments > 0) parts.push(`${newComments} comment${newComments > 1 ? 's' : ''} updated`);
-    if (newReactions > 0) parts.push(`${newReactions} reaction${newReactions > 1 ? 's' : ''} updated`);
-    showToast(parts.join(', '));
-  }, 500);
+  // Toast suppressed — import banner in renderList() handles the notification
   
   return merged;
 }
@@ -455,48 +456,155 @@ function shrink(file, max = 900) {
   });
 }
 
-/* ---------- render ---------- */
-function render() {
-  initializeDB();
+/* ---------- unread / seen tracking ---------- */
+const lastTs = p => (p.comments||[]).reduce(
+  (m, c) => Math.max(m, c.ts || getIdTimestamp(c.id) || 0),
+  p.ts || getIdTimestamp(p.id) || 0
+);
 
+function clockTime(ts) {
+  const d = new Date(ts);
+  return d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0');
+}
+
+const STAMP_DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+function listStamp(ts) {
+  if (!ts) return '';
+  const d = new Date(ts), now = new Date();
+  if (d.toDateString() === now.toDateString()) return clockTime(ts);
+  const yest = new Date(now); yest.setDate(now.getDate() - 1);
+  if (d.toDateString() === yest.toDateString()) return 'Yesterday';
+  const diff = Math.floor((now - d) / 864e5);
+  if (diff < 7) return STAMP_DAYS[d.getDay()];
+  return d.getDate() + '/' + (d.getMonth() + 1);
+}
+
+function readSeen() {
+  try { return JSON.parse(store.getItem(SEEN_KEY)) || {}; } catch { return {}; }
+}
+function writeSeen(map) {
+  try { store.setItem(SEEN_KEY, JSON.stringify(map)); } catch {}
+}
+function unreadCount(p) {
+  const seen = readSeen();
+  const total = (p.comments || []).length;
+  if (!(p.id in seen)) return total + 1;   // never opened: spot itself = 1 unread
+  return Math.max(0, total - seen[p.id]);
+}
+function markRead(p) {
+  const seen = readSeen();
+  seen[p.id] = (p.comments || []).length;
+  writeSeen(seen);
+}
+
+/* ---------- render (WhatsApp-style list) ---------- */
+function render() { renderList(); }
+
+function renderList() {
+  initializeDB();
   const feed = $('#feed');
   if (!feed) return;
-
   feed.innerHTML = '';
 
-  if (!db.posts || db.posts.length === 0) {
-    const empty = el('div', 'empty-state');
-    empty.innerHTML = `
-      <span style="font-size:48px;display:block;margin-bottom:12px;">🏊</span>
-      <h3 style="margin:0 0 8px;">No spots yet</h3>
-      <p style="color:var(--mut);margin:0;font-size:14px;">Tap the + button to add your first water spot</p>
-    `;
-    empty.style.cssText = 'text-align:center;padding:60px 20px;color:var(--mut);';
-    feed.append(empty);
-  } else {
-    db.posts.slice().sort((a, b) => {
-      const tsA = getIdTimestamp(a.id) || a.ts || 0;
-      const tsB = getIdTimestamp(b.id) || b.ts || 0;
-      return tsB - tsA;
-    }).forEach(p => {
-      if (p) feed.appendChild(card(p));
-    });
-  }
-  
   const me = $('#btnMe');
   if (me) {
     me.textContent = db.user ? db.user.charAt(0).toUpperCase() : '?';
     me.style.background = db.user ? colorFor(db.user) : '#c9d1d9';
   }
-  
   const shareBtn = $('#btnShare');
-  if (shareBtn) {
-    shareBtn.style.display = db.posts && db.posts.length > 0 ? 'flex' : 'none';
-  }
-  
+  if (shareBtn) shareBtn.style.display = db.posts && db.posts.length > 0 ? 'flex' : 'none';
   updateSyncPill();
   updateSharePreview();
+
+  if (!db.posts || db.posts.length === 0) {
+    const empty = el('div', 'empty-state');
+    empty.innerHTML = `<span style="font-size:48px;display:block;margin-bottom:12px;">🏊</span><h3 style="margin:0 0 8px;">No spots yet</h3><p style="color:var(--mut);margin:0;font-size:14px;">Tap + to add your first water spot</p>`;
+    empty.style.cssText = 'text-align:center;padding:60px 20px;color:var(--mut);';
+    feed.append(empty);
+    return;
+  }
+
+  // Import banner (shown once after URL-share merge)
+  if (importedIds.size > 0 && !importBannerDismissed) {
+    const fromUsers = [...new Set(
+      [...importedIds].map(id => (db.posts.find(p => p.id === id)||{}).user).filter(Boolean)
+    )];
+    const names = fromUsers.length <= 2 ? fromUsers.join(' & ') : `${fromUsers[0]} & ${fromUsers.length - 1} others`;
+    const count = importedIds.size;
+    const banner = el('div', 'import-banner');
+    const avs = el('div', 'import-banner-avs');
+    fromUsers.slice(0, 3).forEach(u => avs.append(avatar(u, true)));
+    const msg = el('div', 'import-banner-msg');
+    msg.innerHTML = `<b>${count} new spot${count !== 1 ? 's' : ''}</b> from ${names}`;
+    const x = el('button', 'import-banner-x', '×');
+    x.onclick = e => { e.stopPropagation(); importBannerDismissed = true; banner.remove(); };
+    banner.append(avs, msg, x);
+    feed.append(banner);
+  }
+
+  // WhatsApp sort: unread first (newest → oldest), then read (newest → oldest)
+  const byTs = (a, b) => lastTs(b) - lastTs(a);
+  const unread = db.posts.filter(p => p && unreadCount(p) > 0).sort(byTs);
+  const read   = db.posts.filter(p => p && unreadCount(p) === 0).sort(byTs);
+
+  let shownReadDiv = false;
+  [...unread, ...read].forEach((p, i) => {
+    const n = unreadCount(p);
+    if (i === 0 && unread.length > 0) {
+      feed.append(sectionHead(`${unread.length} unread`));
+    }
+    if (n === 0 && !shownReadDiv && unread.length > 0) {
+      feed.append(sectionHead('Earlier', true));
+      shownReadDiv = true;
+    }
+    feed.append(waRow(p, n));
+  });
+  flashPostId = null;   // only flash on the render immediately after posting
 }
+
+function sectionHead(text, muted) {
+  return el('div', 'wa-section-head' + (muted ? ' wa-section-muted' : ''), text);
+}
+
+function waRow(p, n) {
+  const isImported = importedIds.has(p.id);
+  const isNew = p.id === flashPostId;
+  const row = el('div', 'wa-row' + (n > 0 ? ' wa-row-unread' : '') + (isImported ? ' wa-row-imported' : '') + (isNew ? ' flash-new' : ''));
+
+  // Avatar
+  const av = avatar(p.user || 'Anon');
+  row.append(av);
+
+  // Body
+  const body = el('div', 'wa-row-body');
+  const titleRow = el('div', 'wa-row-titlerow');
+  titleRow.append(el('span', 'wa-row-title', p.place || p.desc || 'Spot'));
+  if (isImported) titleRow.append(el('span', 'wa-new-tag', 'NEW'));
+  body.append(titleRow);
+
+  const cmts = p.comments || [];
+  const last = cmts[cmts.length - 1];
+  const preview = el('div', 'wa-row-preview');
+  if (last) {
+    const name = el('b', null, (db.user && last.user === db.user ? 'You' : last.user) + ': ');
+    preview.append(name, document.createTextNode(last.text));
+  } else {
+    preview.textContent = p.desc || '';
+  }
+  body.append(preview);
+  row.append(body);
+
+  // Side: time + badge
+  const side = el('div', 'wa-row-side');
+  side.append(el('span', 'wa-row-time', listStamp(lastTs(p))));
+  if (n > 0) side.append(el('span', 'wa-badge', n > 99 ? '99+' : String(n)));
+  row.append(side);
+
+  row.onclick = () => openThread(p.id);
+  return row;
+}
+
+
 
 function card(p) {
   if (!p) return el('div');
@@ -550,10 +658,143 @@ function card(p) {
   return c;
 }
 
-const refresh = () => { 
-  save(); 
-  render(); 
-};
+const refresh = () => { save(); render(); };
+
+/* ========== THREAD VIEW ========== */
+function openThread(id) {
+  const p = db.posts.find(x => x.id === id);
+  if (!p) return;
+  openPostId = id;
+  markRead(p);
+  renderThread();
+
+  const tv  = $('#threadView');
+  const fab = $('#btnNew');
+  if (tv)  { tv.hidden = false; requestAnimationFrame(() => tv.classList.add('thread-open')); }
+  if (fab) fab.style.display = 'none';
+
+  setTimeout(() => { const b = $('#threadBody'); if (b) b.scrollTop = b.scrollHeight; }, 60);
+}
+
+function closeThread() {
+  const tv  = $('#threadView');
+  const fab = $('#btnNew');
+  if (tv)  { tv.classList.remove('thread-open'); setTimeout(() => { tv.hidden = true; }, 300); }
+  if (fab) fab.style.display = '';
+  openPostId = null;
+  renderList();  // refresh list to reflect updated unread counts
+}
+
+function renderThread() {
+  const p = db.posts.find(x => x.id === openPostId);
+  if (!p) { closeThread(); return; }
+
+  // Header
+  const av = $('#threadAv');
+  if (av) { av.textContent = (p.user||'?').charAt(0).toUpperCase(); av.style.background = colorFor(p.user||'?'); }
+  const titleEl = $('#threadTitle');
+  if (titleEl) titleEl.textContent = p.place || p.desc || 'Spot';
+  const subEl = $('#threadSub');
+  if (subEl) {
+    const n = (p.comments||[]).length;
+    subEl.textContent = p.user + (n > 0 ? ` · ${n} comment${n === 1 ? '' : 's'}` : '');
+  }
+
+  // Body
+  const body = $('#threadBody');
+  if (!body) return;
+  body.innerHTML = '';
+  body.append(spotBody(p));
+  (p.comments||[])
+    .slice()
+    .sort((a,b) => (a.ts||getIdTimestamp(a.id)||0) - (b.ts||getIdTimestamp(b.id)||0))
+    .forEach(c => body.append(commentBubble(p, c)));
+  flashCommentId = null;  // only flash on the render immediately after sending
+}
+
+/* Spot card for thread view — same look as card() but no inline comment form */
+function spotBody(p) {
+  const c = el('div', 'card');
+  const head = el('div', 'card-head');
+  head.append(avatar(p.user || 'Anon', true));
+  const meta = el('div');
+  const postTime = getIdTimestamp(p.id);
+  meta.append(el('div', 'who', p.user || 'Anon'), el('div', 'when', ago(postTime || p.ts)));
+  head.append(meta);
+  c.append(head, el('p', 'desc', p.desc || ''));
+
+  if (p.img) {
+    const imgContainer = el('div', 'img-container');
+    if (p.img.startsWith('data:')) {
+      const i = el('img', 'shot'); i.src = p.img; i.alt = p.desc||''; imgContainer.append(i);
+    } else {
+      const loaded = loadImage(p.img);
+      if (loaded) { const i = el('img', 'shot'); i.src = loaded; i.alt = p.desc||''; imgContainer.append(i); }
+    }
+    c.append(imgContainer);
+  }
+
+  const link = mapLink(p);
+  if (link) {
+    const a = el('a', 'geo', '📍 ' + link.label);
+    a.href = link.url; a.target = '_blank'; a.rel = 'noopener';
+    c.append(a);
+  }
+
+  c.append(reacts(p.reacts||{}, () => { save(); renderThread(); }, p));
+  return c;
+}
+
+/* Individual comment row for thread view */
+function commentBubble(p, cm) {
+  const row = el('div', cm.id === flashCommentId ? 'cm flash-new' : 'cm');
+  row.append(avatar(cm.user || 'Anon', true));
+  const body = el('div', 'cm-body');
+  const m = el('div', 'cm-meta');
+  const commentTime = getIdTimestamp(cm.id);
+  m.append(el('b', null, cm.user||'Anon'), document.createTextNode(' · ' + ago(commentTime||cm.ts)));
+  body.append(m, el('p', 'cm-text', cm.text||''));
+  body.append(reacts(cm.reacts||{}, () => { save(); renderThread(); }, p));
+  row.append(body);
+  return row;
+}
+
+/* Thread composer wiring */
+const threadInput = $('#threadInput');
+const threadCount = $('#threadCount');
+if (threadInput && threadCount) {
+  threadInput.oninput = () => {
+    const len = threadInput.value.length;
+    threadCount.textContent = len + '/' + MAX_LENGTH;
+    threadCount.style.color = len >= MAX_LENGTH ? 'var(--orange)' : '#b6bcc4';
+  };
+}
+
+const threadComposer = $('#threadComposer');
+if (threadComposer) {
+  threadComposer.onsubmit = e => {
+    e.preventDefault();
+    const text = (threadInput ? threadInput.value.trim() : '').slice(0, MAX_LENGTH);
+    if (!text) return;
+    const submit = () => {
+      const p = db.posts.find(x => x.id === openPostId);
+      if (!p) return;
+      const newComment = { id: genId(), user: db.user, text, ts: Date.now(), reacts: {} };
+      flashCommentId = newComment.id;   // flash this bubble when thread re-renders
+      (p.comments = p.comments || []).push(newComment);
+      save();
+      markRead(p);
+      if (threadInput) threadInput.value = '';
+      if (threadCount) threadCount.textContent = '0/' + MAX_LENGTH;
+      renderThread();
+      setTimeout(() => { const b = $('#threadBody'); if (b) b.scrollTop = b.scrollHeight; }, 30);
+    };
+    if (!requireUser(submit)) return;
+    submit();
+  };
+}
+
+if ($('#threadBack')) $('#threadBack').onclick = closeThread;
 
 const MAPS = 'https://www.google.com/maps/search/?api=1&query=';
 function mapLink(p) {
@@ -963,8 +1204,10 @@ function doPost() {
   if (!descInput) return;
   const desc = descInput.value.trim().slice(0, MAX_LENGTH);
   if (!db.posts) db.posts = [];
+  const newId = genId();
+  flashPostId = newId;   // flash this row when list re-renders
   db.posts.push({
-    id: genId(),
+    id: newId,
     user: db.user,
     desc,
     img: draft.img,

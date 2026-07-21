@@ -28,6 +28,7 @@ const store = (() => {
 let db = null;
 let openPostId = null;
 let searchTerm = '';
+let importedIds = new Set();   // post IDs that arrived via the current ?d= share URL
 
 /* ---------- ids & time ---------- */
 const genId = () => Date.now().toString(36) + Math.random().toString(36).slice(2,5);
@@ -307,7 +308,13 @@ function renderRows() {
   const wrap = $('#rows');
   wrap.innerHTML = '';
 
-  const posts = (db.posts || []).filter(matchesSearch).sort((a,b) => lastTs(b) - lastTs(a));
+  const all = (db.posts || []).filter(matchesSearch);
+  const byTime = (a, b) => lastTs(b) - lastTs(a);
+
+  // WhatsApp-style: unread spots float to top, read spots follow
+  const unread = all.filter(p => unreadCount(p) > 0).sort(byTime);
+  const read   = all.filter(p => unreadCount(p) === 0).sort(byTime);
+  const posts  = [...unread, ...read];
 
   if (!posts.length) {
     const e = el('div','empty');
@@ -317,15 +324,39 @@ function renderRows() {
     return;
   }
 
-  posts.forEach(p => {
-    const row = el('button','row');
+  let shownReadDiv = false;
+
+  posts.forEach((p, i) => {
+    const n = unreadCount(p);
+
+    // Section dividers (only when not searching)
+    if (!searchTerm) {
+      if (i === 0 && unread.length > 0) {
+        const d = el('div', 'section-head', `${unread.length} unread`);
+        wrap.append(d);
+      }
+      if (n === 0 && !shownReadDiv && unread.length > 0) {
+        wrap.append(el('div', 'section-head section-head-muted', 'Earlier'));
+        shownReadDiv = true;
+      }
+    }
+
+    const isImported = importedIds.has(p.id);
+    const row = el('button',
+      'row' + (n > 0 ? ' row-unread' : '') + (isImported ? ' row-imported' : ''));
 
     const avWrap = el('div','row-av');
     avWrap.append(avatar(p.user, 'xl'));
     row.append(avWrap);
 
     const main = el('div','row-main');
-    main.append(el('div','row-title', p.place || p.desc));
+
+    const titleRow = el('div', 'row-title-row');
+    titleRow.append(el('div','row-title', p.place || p.desc));
+    if (isImported) {
+      titleRow.append(el('span', 'row-new-tag', 'NEW'));
+    }
+    main.append(titleRow);
 
     // preview line: who said what, most recent first
     const comments = p.comments || [];
@@ -347,7 +378,7 @@ function renderRows() {
     if (people.length > 1) {
       const faces = el('div','row-faces');
       const pile = el('div','facepile');
-      people.slice(0, 4).forEach(n => pile.append(avatar(n, 'xs')));
+      people.slice(0, 4).forEach(nm => pile.append(avatar(nm, 'xs')));
       faces.append(pile);
       const extra = people.length - 4;
       const label = comments.length
@@ -360,10 +391,10 @@ function renderRows() {
     row.append(main);
 
     const side = el('div','row-side');
-    const n = unreadCount(p);
     const pill = el('span','pill' + (n ? '' : ' zero'), n > 99 ? '99+' : String(n));
     side.append(pill);
-    side.append(el('span','row-time', listStamp(lastTs(p))));
+    const timeEl = el('span', 'row-time', listStamp(lastTs(p)));
+    side.append(timeEl);
     row.append(side);
 
     row.onclick = () => openThread(p.id);
@@ -901,27 +932,55 @@ function seed() {
 
 /* ================= boot ================= */
 const arrivedShared = !!new URLSearchParams(location.search).get(SHARE_KEY);
-const beforeCount = (() => {
-  try { const d = JSON.parse(store.getItem(KEY)); return d && d.posts ? d.posts.length : 0; }
-  catch { return 0; }
-})();
+
+// Snapshot existing IDs *before* merge so we know what's truly new
+const preIds = new Set();
+try {
+  const stored = store.getItem(KEY);
+  if (stored) { const d = JSON.parse(stored); (d?.posts || []).forEach(p => preIds.add(p.id)); }
+} catch {}
 
 db = load();
 if (!db.posts) db.posts = [];
 save();
+
+// Compute which posts just arrived via the share URL
+if (arrivedShared) {
+  db.posts.forEach(p => { if (!preIds.has(p.id)) importedIds.add(p.id); });
+}
+
 render();
 
 if (arrivedShared) {
-  const gained = db.posts.length - beforeCount;
-  // drop the payload from the address bar once it's merged in — reloads stay clean
+  // drop the ?d= payload from the address bar so reloads stay clean
   if (window.history && history.replaceState) {
     history.replaceState({}, '', location.pathname);
   }
-  setTimeout(() => {
-    toast(gained > 0
-      ? `${gained} new spot${gained === 1 ? '' : 's'} merged in`
-      : 'Already up to date');
-  }, 500);
+
+  if (importedIds.size > 0) {
+    // Collect unique authors of imported spots
+    const fromUsers = [...new Set(
+      [...importedIds].map(id => (db.posts.find(x => x.id === id) || {}).user).filter(Boolean)
+    )];
+    const names = fromUsers.length <= 2
+      ? fromUsers.join(' & ')
+      : `${fromUsers[0]} & ${fromUsers.length - 1} others`;
+    const count = importedIds.size;
+
+    // Show import banner at top of list panel
+    const panel = $('.sheet-panel');
+    const banner = el('div', 'import-banner');
+    const avs = el('div', 'import-banner-av');
+    fromUsers.slice(0, 3).forEach(u => avs.append(avatar(u, 'sm')));
+    const msg = el('div', 'import-banner-msg');
+    msg.innerHTML = `<b>${count} new spot${count !== 1 ? 's' : ''}</b> from ${names}`;
+    const x = el('button', 'import-banner-x', '×');
+    x.onclick = e => { e.stopPropagation(); banner.remove(); };
+    banner.append(avs, msg, x);
+    panel.prepend(banner);
+  } else {
+    setTimeout(() => toast('Already up to date'), 500);
+  }
 }
 
 window._v2 = { db, shareUrl, readSeen, participants };
