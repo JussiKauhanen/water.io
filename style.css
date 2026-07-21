@@ -234,11 +234,11 @@ button.ghost{background:none;border:0;color:var(--mut);padding:10px 12px;cursor:
 
 /* ---- FAB ---- */
 .fab{
-  position:absolute;right:18px;bottom:24px;width:56px;height:56px;border-radius:50%;
+  position:fixed;right:18px;bottom:24px;width:56px;height:56px;border-radius:50%;
   border:0;background:var(--orange);color:#fff;font-size:30px;
   /* flex centering is more reliable than grid in Safari for button text */
   display:flex;align-items:center;justify-content:center;line-height:1;
-  cursor:pointer;box-shadow:0 4px 12px rgba(255,115,34,0.3);
+  cursor:pointer;
 }
 .fab:hover{background:var(--orange-d)}
 .fab:active{transform:scale(0.95)}
