@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>water.io</title>
+<link rel="stylesheet" href="style.css">
+<!-- LZString for URL compression -->
+<script src="https://cdn.jsdelivr.net/npm/lz-string@1.5.0/lz-string.min.js"></script>
+</head>
+<body>
+
+<div class="stage">
+  <svg class="phone" viewBox="0 0 400 812" aria-hidden="true">
+    <rect x="4" y="4" width="392" height="804" rx="54" fill="#1b1f24"/>
+    <rect x="14" y="14" width="372" height="784" rx="46" fill="#fff"/>
+    <rect x="160" y="24" width="80" height="18" rx="9" fill="#1b1f24"/>
+    <rect x="150" y="782" width="100" height="5" rx="2.5" fill="#1b1f24" opacity=".35"/>
+  </svg>
+
+  <main class="screen">
+    <header class="top">
+      <h1>water<span>.io</span></h1>
+      <div class="top-actions">
+        <button class="icon" id="btnShare" title="Share" style="display:none">🔗</button>
+        <button class="icon" id="btnExport" title="Export JSON">↓</button>
+        <button class="icon" id="btnImport" title="Import JSON">↑</button>
+        <button class="avatar" id="btnMe" title="Your name"></button>
+      </div>
+    </header>
+
+    <div class="feed" id="feed"></div>
+
+    <button class="fab" id="btnNew" aria-label="New spot">+</button>
+  </main>
+</div>
+
+<!-- username -->
+<div class="sheet-wrap" id="nameSheet" hidden>
+  <div class="sheet">
+    <h2>Pick a username</h2>
+    <p class="hint">Shown on your posts. Change it any time from your avatar.</p>
+    <input id="nameInput" maxlength="20" placeholder="e.g. Raoul" autocomplete="off">
+    <div class="row end">
+      <button class="ghost" id="nameCancel">Cancel</button>
+      <button class="primary" id="nameSave">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- new post -->
+<div class="sheet-wrap" id="postSheet" hidden>
+  <div class="sheet">
+    <div class="sheet-head">
+      <h2>New spot</h2>
+      <button class="x" id="postCancel" aria-label="Close">×</button>
+    </div>
+
+    <label class="drop" id="dropLabel">
+      <input type="file" id="pImg" accept="image/*" hidden>
+      <img class="preview" id="pPrev" hidden alt="">
+      <span class="drop-cta" id="dropCta">
+        <b>+</b> Add a photo
+        <em>we'll read the location from it</em>
+      </span>
+    </label>
+
+    <div class="field">
+      <textarea id="pDesc" maxlength="60" rows="2"
+        placeholder="Describe the spot in a few words"></textarea>
+      <div class="count" id="descCount">0 / 60</div>
+    </div>
+
+    <div class="geobar" id="geoBar">
+      <span class="dot"></span>
+      <span id="geoText">Locating…</span>
+      <button class="link" id="geoManual">add address</button>
+    </div>
+    <div class="row" id="manualRow" hidden>
+      <input id="pPlace" maxlength="80" placeholder="Address or place name">
+    </div>
+
+    <button class="primary block" id="postSave">Post spot</button>
+  </div>
+</div>
+
+<input type="file" id="fileImport" accept="application/json" hidden>
+<script src="app.js"></script>
+</body>
+</html>
