@@ -741,6 +741,40 @@ function spotBody(p) {
     c.append(a);
   }
 
+  // Static map preview — only rendered when spot is opened, uses user's saved map style
+  if (p.lat != null && p.lng != null) {
+    const previewId = 'smp_' + p.id + '_' + Date.now();
+    const mapDiv = el('div', 'spot-map-preview');
+    mapDiv.id = previewId;
+    c.append(mapDiv);
+
+    setTimeout(() => {
+      const container = document.getElementById(previewId);
+      if (!container || !window.L) return;
+
+      const style = store.getItem('water.io.mapStyle') || 'voyager';
+      const tiles = MAP_TILES[style] || MAP_TILES.voyager;
+
+      const miniMap = L.map(container, {
+        dragging: false, zoomControl: false, scrollWheelZoom: false,
+        doubleClickZoom: false, touchZoom: false, keyboard: false,
+        tap: false, attributionControl: false,
+      }).setView([p.lat, p.lng], 14);
+
+      L.tileLayer(tiles.url, { maxZoom: 19 }).addTo(miniMap);
+
+      const pin = L.divIcon({
+        className: '',
+        html: `<svg width="20" height="26" viewBox="0 0 28 36" xmlns="http://www.w3.org/2000/svg">
+          <path d="M14 0C6.27 0 0 6.27 0 14c0 9.625 14 22 14 22S28 23.625 28 14C28 6.27 21.73 0 14 0z" fill="#ff7322"/>
+          <circle cx="14" cy="14" r="6" fill="#fff"/>
+        </svg>`,
+        iconSize: [20, 26], iconAnchor: [10, 26],
+      });
+      L.marker([p.lat, p.lng], { icon: pin }).addTo(miniMap);
+    }, 60);
+  }
+
   c.append(reacts(p.reacts||{}, () => { save(); renderThread(); }, p));
   return c;
 }

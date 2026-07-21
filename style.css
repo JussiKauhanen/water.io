@@ -616,6 +616,17 @@ button.ghost{background:none;border:0;color:var(--mut);padding:10px 12px;cursor:
 .import-banner-x:hover { color: var(--ink); }
 
 /* ================================================================
+   Spot map preview (thread view only)
+   ================================================================ */
+.spot-map-preview {
+  width: 100%; height: 150px;
+  border-radius: 12px; margin-top: 10px;
+  overflow: hidden; background: #e8ecf0;
+  /* prevent Leaflet's default cursor interfering with thread scroll */
+  pointer-events: none;
+}
+
+/* ================================================================
    Thread view — slides in from the right over the feed
    ================================================================ */
 .thread-view {
