@@ -160,7 +160,8 @@ button.ghost{background:none;border:0;color:var(--mut);padding:10px 12px;cursor:
 /* ---- FAB ---- */
 .fab{
   position:absolute;right:18px;bottom:24px;width:56px;height:56px;border-radius:50%;
-  border:0;background:var(--orange);color:#fff;font-size:30px;line-height:1;
+  border:0;background:var(--orange);color:#fff;font-size:30px;
+  display:grid;place-items:center;
   cursor:pointer;box-shadow:0 4px 12px rgba(255,115,34,0.3);
 }
 .fab:hover{background:var(--orange-d)}
@@ -331,34 +332,7 @@ button.ghost{background:none;border:0;color:var(--mut);padding:10px 12px;cursor:
 }
 
 /* ---- Sync Sheet ---- */
-.sync-meta {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 0 10px;
-  border-bottom: 1px solid var(--line);
-  margin-bottom: 10px;
-}
-.sync-from {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-  font-weight: 600;
-}
-.sync-time {
-  font-size: 12px;
-  color: var(--mut);
-  text-align: right;
-}
-.sync-stats {
-  font-size: 13px;
-  color: var(--mut);
-  margin-bottom: 16px;
-}
 .sync-graph {
-  display: flex;
-  justify-content: center;
   padding: 4px 0 8px;
   overflow: visible;
 }

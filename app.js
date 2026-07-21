@@ -139,54 +139,78 @@ function mergeStates(sharedData) {
     if (sharedData._timestamp) {
       store.setItem(SYNC_KEY, String(sharedData._timestamp));
     }
-    return sharedData;
+    // Don't carry the sharer's username over — recipient starts with no username
+    return { ...sharedData, user: null };
   }
   
   console.log('Merging shared state with existing data...');
-  
+
   const postMap = new Map();
   existing.posts.forEach(p => {
     if (p && p.id) postMap.set(p.id, p);
   });
-  
+
   let mergedCount = 0;
+  let newComments = 0;
+  let newReactions = 0;
+  let newPostsAdded = 0;
+
   sharedData.posts.forEach(p => {
     if (!p || !p.id) return;
-    
+
     if (postMap.has(p.id)) {
       const existingPost = postMap.get(p.id);
+
+      // Count new reaction users before merging
+      Object.entries(p.reacts || {}).forEach(([emoji, users]) => {
+        const existing_ = existingPost.reacts[emoji] || [];
+        (users || []).forEach(u => { if (!existing_.includes(u)) newReactions++; });
+      });
       existingPost.reacts = { ...existingPost.reacts, ...p.reacts };
-      
+
       const commentMap = new Map();
       (existingPost.comments || []).forEach(c => {
         if (c && c.id) commentMap.set(c.id, c);
       });
-      
+
       (p.comments || []).forEach(c => {
         if (!c || !c.id) return;
         if (commentMap.has(c.id)) {
           const existingComment = commentMap.get(c.id);
+          // Count new reaction users on comments
+          Object.entries(c.reacts || {}).forEach(([emoji, users]) => {
+            const existing_ = existingComment.reacts[emoji] || [];
+            (users || []).forEach(u => { if (!existing_.includes(u)) newReactions++; });
+          });
           existingComment.reacts = { ...existingComment.reacts, ...c.reacts };
           if (c.text) existingComment.text = c.text;
         } else {
           commentMap.set(c.id, c);
+          newComments++;
         }
       });
-      
+
       existingPost.comments = Array.from(commentMap.values())
         .sort((a, b) => (a.id || 0) - (b.id || 0));
-      
+
       if (p.desc) existingPost.desc = p.desc;
       if (p.img) existingPost.img = p.img;
       if (p.lat != null) existingPost.lat = p.lat;
       if (p.lng != null) existingPost.lng = p.lng;
       if (p.place) existingPost.place = p.place;
-      
+
       mergedCount++;
     } else {
       postMap.set(p.id, p);
+      newPostsAdded++;
     }
   });
+
+  // Nothing actually changed — silently return existing data, no toast, no history entry
+  if (newPostsAdded === 0 && newComments === 0 && newReactions === 0) {
+    console.log('No actual changes in shared URL, skipping merge');
+    return existing;
+  }
   
   const mergedPosts = Array.from(postMap.values())
     .sort((a, b) => {
@@ -194,24 +218,25 @@ function mergeStates(sharedData) {
       const tsB = getIdTimestamp(b.id) || b.ts || 0;
       return tsB - tsA;
     });
-  
+
   const merged = {
-    user: sharedData.user || existing.user || null,
+    user: existing.user || null,  // never override recipient's username from shared link
     posts: mergedPosts,
     _merged: true,
     _timestamp: Date.now(),
     _sharedTimestamp: sharedData._timestamp || Date.now()
   };
-  
+
   store.setItem(SYNC_KEY, String(merged._timestamp));
 
   // Record merge event for sync history
-  const newCount = mergedPosts.length - existing.posts.length;
   try {
     const event = {
       ts: Date.now(),
       from: sharedData.user || null,
-      newPosts: newCount,
+      newPosts: newPostsAdded,
+      newComments,
+      newReactions,
       postsMerged: mergedCount,
       totalPosts: mergedPosts.length
     };
@@ -228,11 +253,11 @@ function mergeStates(sharedData) {
   }
 
   setTimeout(() => {
-    if (newCount > 0) {
-      showToast(`Added ${newCount} new spot${newCount > 1 ? 's' : ''} from shared link`);
-    } else {
-      showToast(`Merged reactions from ${mergedCount} spot${mergedCount > 1 ? 's' : ''}`);
-    }
+    const parts = [];
+    if (newPostsAdded > 0) parts.push(`${newPostsAdded} post${newPostsAdded > 1 ? 's' : ''} added`);
+    if (newComments > 0) parts.push(`${newComments} comment${newComments > 1 ? 's' : ''} updated`);
+    if (newReactions > 0) parts.push(`${newReactions} reaction${newReactions > 1 ? 's' : ''} updated`);
+    showToast(parts.join(', '));
   }, 500);
   
   return merged;
@@ -553,22 +578,31 @@ function reacts(map, done, parent) {
     const b = el('button', 'chip' + (users.includes(db.user) ? ' on' : ''), `${e} ${users.length}`);
     b.onclick = (ev) => {
       ev.stopPropagation();
-      showReactionBottomSheet(e, users, map, done);
+      const doToggle = () => {
+        toggle(map, e);
+        done();
+        const hasReactions = Object.values(map).some(u => u && u.length > 0);
+        if (hasReactions) showReactionBottomSheet(map);
+      };
+      if (!requireUser(doToggle)) return;
+      doToggle();
     };
     wrap.append(b);
   });
-  
+
   const add = el('button', 'chip add', '☺');
   add.onclick = () => {
-    if (!requireUser()) return;
-    
-    const picker = el('div', 'reacts');
-    EMOJI.forEach(e => {
-      const b = el('button', 'chip', e);
-      b.onclick = () => { toggle(map, e); done(); };
-      picker.append(b);
-    });
-    add.replaceWith(picker);
+    const showPicker = () => {
+      const picker = el('div', 'reacts');
+      EMOJI.forEach(e => {
+        const b = el('button', 'chip', e);
+        b.onclick = () => { toggle(map, e); done(); };
+        picker.append(b);
+      });
+      add.replaceWith(picker);
+    };
+    if (!requireUser(showPicker)) return;
+    showPicker();
   };
   wrap.append(add);
   return wrap;
@@ -579,68 +613,56 @@ function toggle(map, e) {
     console.warn('Cannot toggle reaction: No user set');
     return;
   }
-  
+  // One reaction per user: remove from all other emojis first
+  Object.keys(map).forEach(k => {
+    if (k !== e) map[k] = (map[k] || []).filter(u => u !== db.user);
+  });
   if (!map[e]) map[e] = [];
   const u = map[e];
   const i = u.indexOf(db.user);
   i < 0 ? u.push(db.user) : u.splice(i, 1);
-  hideReactionSheet();
 }
 
 /* ---------- Reaction Bottom Sheet ---------- */
 let currentReactionContext = null;
 
-function showReactionBottomSheet(emoji, users, map, done) {
+function showReactionBottomSheet(map) {
   const sheet = $('#reactionSheet');
   const title = $('#reactionTitle');
   const userList = $('#reactionUsers');
   const picker = $('#reactionPicker');
-  
-  if (!sheet || !title || !userList || !picker) return;
-  
-  currentReactionContext = { emoji, users, map, done };
-  
-  title.textContent = `${emoji} ${users.length} person${users.length > 1 ? 's' : ''}`;
-  
+
+  if (!sheet || !title || !userList) return;
+
+  title.textContent = 'Reactions';
+
   userList.innerHTML = '';
-  users.forEach(name => {
-    const item = el('div', 'reaction-user');
-    item.append(avatar(name, true));
-    const label = el('span', null, name);
-    if (name === db.user) {
-      label.style.fontWeight = '600';
-      label.style.color = 'var(--orange)';
-      label.textContent += ' (you)';
-    }
-    item.append(label);
-    userList.append(item);
-  });
-  
-  picker.innerHTML = '';
-  EMOJI.forEach(e => {
-    const btn = el('button', 'reaction-emoji-btn');
-    btn.textContent = e;
-    btn.dataset.emoji = e;
-    if (map[e] && map[e].includes(db.user)) {
-      btn.classList.add('active');
-    }
-    btn.onclick = () => {
-      if (!requireUser()) return;
-      toggle(map, e);
-      if (done) done();
-      const newUsers = map[e] || [];
-      showReactionBottomSheet(e, newUsers, map, done);
-    };
-    picker.append(btn);
-  });
-  
+  const entries = Object.entries(map).filter(([, u]) => u && u.length);
+  entries.sort((a, b) => b[1].length - a[1].length);
+
+  if (entries.length === 0) {
+    const empty = el('p', null, 'No reactions yet');
+    empty.style.cssText = 'color:var(--mut);font-size:14px;margin:8px 0';
+    userList.append(empty);
+  } else {
+    entries.forEach(([e, users]) => {
+      const item = el('div', 'reaction-user');
+      const emojiEl = el('span', null, e);
+      emojiEl.style.fontSize = '18px';
+      const namesEl = el('span', null, users.map(u => u === db.user ? 'You' : u).join(', '));
+      namesEl.style.cssText = 'font-size:13px;color:var(--mut);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+      item.append(emojiEl, namesEl);
+      userList.append(item);
+    });
+  }
+
+  if (picker) picker.innerHTML = '';
+
   sheet.hidden = false;
   sheet.style.display = 'flex';
   sheet.style.opacity = '1';
   sheet.style.pointerEvents = 'auto';
-  setTimeout(() => {
-    sheet.classList.add('visible');
-  }, 10);
+  setTimeout(() => sheet.classList.add('visible'), 10);
 }
 
 function hideReactionSheet() {
@@ -649,6 +671,9 @@ function hideReactionSheet() {
   sheet.classList.remove('visible');
   setTimeout(() => {
     sheet.hidden = true;
+    sheet.style.display = '';
+    sheet.style.opacity = '';
+    sheet.style.pointerEvents = '';
   }, 300);
   currentReactionContext = null;
 }
@@ -699,27 +724,17 @@ function comments(p) {
   form.onsubmit = ev => {
     ev.preventDefault();
     const t = input.value.trim();
-    if (!t) {
-      showToast('Please enter a comment');
-      return;
-    }
-    if (!requireUser()) {
-      showToast('Please set a username first');
-      return;
-    }
-    if (t.length > MAX_LENGTH) {
-      showToast('Comment too long! Max ' + MAX_LENGTH + ' characters');
-      return;
-    }
-    if (!p.comments) p.comments = [];
-    p.comments.push({ 
-      id: genId(),
-      user: db.user, 
-      text: t, 
-      ts: Date.now(), 
-      reacts: {} 
-    });
-    refresh();
+    if (!t) { showToast('Please enter a comment'); return; }
+    if (t.length > MAX_LENGTH) { showToast('Comment too long! Max ' + MAX_LENGTH + ' characters'); return; }
+
+    const submitComment = () => {
+      if (!p.comments) p.comments = [];
+      p.comments.push({ id: genId(), user: db.user, text: t, ts: Date.now(), reacts: {} });
+      refresh();
+    };
+
+    if (!requireUser(submitComment)) return;
+    submitComment();
   };
   box.append(form);
   return box;
@@ -755,14 +770,15 @@ const hide = s => {
   }
 };
 
-function requireUser() {
+function requireUser(pendingFn) {
   console.log('requireUser called, db.user:', db.user);
-  
+
   if (db.user && db.user.trim() !== '') {
     console.log('User exists:', db.user);
     return true;
   }
-  
+
+  pendingAction = pendingFn || null;
   console.log('No user found, showing name sheet');
   
   const sheet = $('#nameSheet');
@@ -821,17 +837,23 @@ $('#nameSave').onclick = () => {
   }
   
   // Refresh the UI
-  render();
-  showToast('Welcome, ' + name + '! 🏊');
+  showToast('Welcome, ' + name + '!');
 
   if (pendingPost) {
     pendingPost = false;
-    doPost();
+    doPost(); // calls refresh() internally
+  } else if (pendingAction) {
+    const action = pendingAction;
+    pendingAction = null;
+    action(); // calls refresh() internally (or will after emoji pick)
+  } else {
+    render(); // no pending action — just update the avatar etc.
   }
 };
 
 $('#nameCancel').onclick = () => {
   pendingPost = false;
+  pendingAction = null;
   const sheet = $('#nameSheet');
   if (sheet) {
     sheet.classList.remove('visible');
@@ -896,11 +918,7 @@ document.querySelectorAll('.sheet-wrap').forEach(w => {
 
 // Close reaction sheet function
 function closeReactionSheet() {
-  const sheet = $('#reactionSheet');
-  if (sheet) {
-    sheet.hidden = true;
-    sheet.style.display = 'none';
-  }
+  hideReactionSheet();
 }
 
 // Close on Escape key
@@ -915,6 +933,7 @@ document.addEventListener('keydown', (e) => {
 /* ---------- new post ---------- */
 let draft = { img: null, lat: null, lng: null, place: '' };
 let pendingPost = false;
+let pendingAction = null; // reaction or comment waiting for username
 
 function validatePost() {
   const descVal = (($('#pDesc') || {}).value || '').trim();
@@ -1191,6 +1210,9 @@ if ($('#btnShare')) {
 if ($('#shareClose')) {
   $('#shareClose').onclick = hideShareModal;
 }
+if ($('#reactionClose')) {
+  $('#reactionClose').onclick = hideReactionSheet;
+}
 
 // Copy link
 if ($('#shareCopy')) {
@@ -1311,73 +1333,119 @@ function updateSyncPill() {
 }
 
 function buildMergeGraph(hist) {
-  if (!hist || hist.length === 0) return '';
+  if (!hist || hist.length === 0) return '<p style="color:var(--mut);font-size:13px;padding:12px 0">No syncs yet</p>';
 
-  const ROW_H = 44;
-  const PAD_V = 20;
-  const MAIN_X = 148;
-  const W = 220;
+  const ROW_H    = 64;
+  const PAD_V    = 20;
+  const PAD_B    = 16;   // extra bottom padding
+  const MAIN_X   = 76;
+  const NODE_R   = 7;
+  const USER_R   = 13;
+  const MAIN_COLOR = '#2fa87c';
 
-  // Unique from-users in order of first appearance (newest first = top)
-  const fromUsers = [];
-  hist.forEach(m => {
-    if (m.from && !fromUsers.includes(m.from)) fromUsers.push(m.from);
+  // --- Version numbering (oldest-first) ---
+  const histOldFirst = [...hist].reverse();
+  let major = 1, minor = 0;
+  const versionsOldFirst = histOldFirst.map((m, i) => {
+    if (i > 0) {
+      if (m.newPosts > 0) { major++; minor = 0; }
+      else { minor++; }
+    }
+    return `v${major}.${minor}`;
   });
+  const versions = versionsOldFirst.reverse();
 
-  // X position per from-user, spread left of main branch
-  const spread = fromUsers.length > 1
-    ? Math.min(40, (MAIN_X - 28) / fromUsers.length)
-    : MAIN_X - 40;
-  const userX = {};
-  fromUsers.forEach((u, i) => { userX[u] = 20 + i * spread; });
+  // --- Senders → right-side x positions ---
+  const senders = [];
+  hist.forEach(m => { if (m.from && !senders.includes(m.from)) senders.push(m.from); });
+  const BRANCH_GAP = 58;
+  const BRANCH_START = MAIN_X + 58;
+  const senderX = {};
+  senders.forEach((u, i) => { senderX[u] = BRANCH_START + i * BRANCH_GAP; });
 
-  // Layout: row 0 = "you now" at top, row i+1 = hist[i]
-  const H = PAD_V + (hist.length + 1) * ROW_H + PAD_V;
-  const youY = PAD_V;
-  const rowY = i => PAD_V + (i + 1) * ROW_H;
+  // --- Change label builder ---
+  function changeLabel(m) {
+    const parts = [];
+    if (m.newPosts > 0) parts.push(`${m.newPosts} post${m.newPosts > 1 ? 's' : ''} added`);
+    if (m.newComments > 0) parts.push(`${m.newComments} comment${m.newComments > 1 ? 's' : ''} updated`);
+    if (m.newReactions > 0) parts.push(`${m.newReactions} reaction${m.newReactions > 1 ? 's' : ''} updated`);
+    if (parts.length === 0 && m.postsMerged > 0) parts.push(`${m.postsMerged} post${m.postsMerged > 1 ? 's' : ''} updated`);
+    return parts.join(', ');
+  }
 
-  let s = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">`;
+  // Estimate max label width to set SVG W
+  const maxLabelChars = hist.reduce((mx, m) => Math.max(mx, changeLabel(m).length), 0);
+  const labelW = maxLabelChars * 6.2 + 10;
+  const lastSenderX = senders.length > 0 ? BRANCH_START + (senders.length - 1) * BRANCH_GAP : MAIN_X;
+  const W = Math.max(310, lastSenderX + USER_R + labelW + 10);
+  const H = PAD_V + (hist.length + 1) * ROW_H + PAD_B;
+  const youY  = PAD_V;
+  const rowY  = i => PAD_V + (i + 1) * ROW_H;
+  const lastY = rowY(hist.length - 1);
 
-  // Main branch vertical line
-  s += `<line x1="${MAIN_X}" y1="${youY}" x2="${MAIN_X}" y2="${rowY(hist.length - 1)}" stroke="#dfe3e8" stroke-width="2"/>`;
+  let s = `<svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">`;
 
-  // Per from-user: vertical branch line spanning their appearances
-  fromUsers.forEach(u => {
+  // Main trunk line
+  s += `<line x1="${MAIN_X}" y1="${youY + USER_R}" x2="${MAIN_X}" y2="${lastY + NODE_R}" stroke="${MAIN_COLOR}" stroke-width="2.5"/>`;
+
+  // Per-sender branch lines (repeat senders only)
+  senders.forEach(u => {
     const ys = hist.map((m, i) => m.from === u ? rowY(i) : null).filter(y => y !== null);
     if (ys.length < 2) return;
-    s += `<line x1="${userX[u]}" y1="${ys[0]}" x2="${userX[u]}" y2="${ys[ys.length - 1]}" stroke="${colorFor(u)}" stroke-width="2" opacity="0.3"/>`;
+    s += `<line x1="${senderX[u]}" y1="${ys[0]}" x2="${senderX[u]}" y2="${ys[ys.length - 1]}" stroke="${colorFor(u)}" stroke-width="2"/>`;
   });
 
-  // Merge events (hist[0] = latest = top)
+  // --- Merge rows (hist[0] = newest = top) ---
   hist.forEach((m, i) => {
-    const y = rowY(i);
+    const y   = rowY(i);
+    const ver = versions[i];
+    const isMajor = ver.split('.')[1] === '0';
     const col = m.from ? colorFor(m.from) : '#8b939d';
-    const fx = m.from ? userX[m.from] : MAIN_X - 36;
+    const fx  = m.from ? senderX[m.from] : null;
 
-    // Bezier connector from from-user to main branch
-    if (m.from && fx !== MAIN_X) {
-      const mid = (fx + MAIN_X) / 2;
-      s += `<path d="M${fx},${y} C${mid},${y} ${mid},${y} ${MAIN_X},${y}" fill="none" stroke="${col}" stroke-width="1.5" opacity="0.45"/>`;
+    // Connector: trunk node → user circle
+    if (fx !== null) {
+      s += `<line x1="${MAIN_X + NODE_R}" y1="${y}" x2="${fx - USER_R}" y2="${y}" stroke="${col}" stroke-width="2"/>`;
     }
 
-    // From-user dot with initial
-    if (m.from) {
-      s += `<circle cx="${fx}" cy="${y}" r="9" fill="${col}"/>`;
-      s += `<text x="${fx}" y="${y + 4.5}" text-anchor="middle" font-size="8" font-weight="700" fill="#fff">${m.from.charAt(0).toUpperCase()}</text>`;
+    // Version pill (no border — just soft fill)
+    const verColor = isMajor ? '#1a6642' : '#8f5c00';
+    const verFill  = isMajor ? '#d8f0e4' : '#fdefd0';
+    const verText  = ver;
+    const pillW = verText.length * 7 + 12;
+    const pillH = 18;
+    const px = MAIN_X - NODE_R - 6 - pillW;
+    const py = y - pillH / 2;
+    s += `<rect x="${px}" y="${py}" width="${pillW}" height="${pillH}" rx="5" fill="${verFill}"/>`;
+    s += `<text x="${px + pillW / 2}" y="${y + 5}" text-anchor="middle" font-size="9.5" font-weight="700" fill="${verColor}">${verText}</text>`;
+
+    // Main trunk node (open circle, white fill)
+    s += `<circle cx="${MAIN_X}" cy="${y}" r="${NODE_R}" fill="#fff" stroke="${MAIN_COLOR}" stroke-width="2.5"/>`;
+
+    // User avatar + branch label
+    if (fx !== null) {
+      s += `<circle cx="${fx}" cy="${y}" r="${USER_R}" fill="${col}"/>`;
+      s += `<text x="${fx}" y="${y + 4.5}" text-anchor="middle" font-size="9" font-weight="700" fill="#fff">${m.from.charAt(0).toUpperCase()}</text>`;
+
+      const lx = fx + USER_R + 7;
+      const lbl = changeLabel(m);
+      if (lbl) {
+        s += `<text x="${lx}" y="${y - 1}" font-size="10" font-weight="600" fill="#3d4347">${lbl}</text>`;
+      }
+      s += `<text x="${lx}" y="${y + 12}" font-size="8.5" fill="#aab0b9">${m.from} · ${ago(m.ts)}</text>`;
+    } else {
+      // Unknown sender — time to right of trunk
+      s += `<text x="${MAIN_X + NODE_R + 8}" y="${y + 4.5}" font-size="8.5" fill="#aab0b9">${ago(m.ts)}</text>`;
     }
-
-    // Merge dot on main branch
-    s += `<circle cx="${MAIN_X}" cy="${y}" r="5" fill="${col}" stroke="#fff" stroke-width="2"/>`;
-
-    // Time label right of main branch
-    s += `<text x="${MAIN_X + 12}" y="${y + 4}" font-size="9" fill="#8b939d">${ago(m.ts)}</text>`;
   });
 
-  // "You now" dot at top
+  // "You · now" at top
   const meCol = db.user ? colorFor(db.user) : '#8b939d';
-  s += `<circle cx="${MAIN_X}" cy="${youY}" r="9" fill="${meCol}"/>`;
-  s += `<text x="${MAIN_X}" y="${youY + 4.5}" text-anchor="middle" font-size="8" font-weight="700" fill="#fff">${(db.user || '?').charAt(0).toUpperCase()}</text>`;
-  s += `<text x="${MAIN_X + 14}" y="${youY + 4.5}" font-size="9" fill="${meCol}" font-weight="600">now</text>`;
+  const meInit = (db.user || '?').charAt(0).toUpperCase();
+  s += `<circle cx="${MAIN_X}" cy="${youY}" r="${USER_R}" fill="${meCol}"/>`;
+  s += `<text x="${MAIN_X}" y="${youY + 4.5}" text-anchor="middle" font-size="9" font-weight="700" fill="#fff">${meInit}</text>`;
+  s += `<text x="${MAIN_X + USER_R + 7}" y="${youY - 1}" font-size="10" font-weight="600" fill="${meCol}">${db.user || 'You'}</text>`;
+  s += `<text x="${MAIN_X + USER_R + 7}" y="${youY + 12}" font-size="8.5" fill="#aab0b9">now</text>`;
 
   s += '</svg>';
   return s;
@@ -1386,44 +1454,14 @@ function buildMergeGraph(hist) {
 function showSyncSheet() {
   const sheet = $('#syncSheet');
   if (!sheet) return;
-
   try {
     const raw = store.getItem(MERGE_HISTORY_KEY);
     const hist = raw ? JSON.parse(raw) : [];
-    const latest = hist[0];
-
-    const timeEl = $('#syncTime');
-    if (timeEl && latest) {
-      const d = new Date(latest.ts);
-      timeEl.textContent =
-        d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) +
-        ' · ' +
-        d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-    }
-
-    const fromEl = $('#syncFrom');
-    if (fromEl) {
-      fromEl.innerHTML = '';
-      const name = (latest && latest.from) || 'Unknown';
-      fromEl.append(avatar(name, true));
-      fromEl.append(el('span', null, name));
-    }
-
-    const statsEl = $('#syncStats');
-    if (statsEl && latest) {
-      const parts = [latest.totalPosts + ' spot' + (latest.totalPosts !== 1 ? 's' : '')];
-      if (latest.newPosts > 0) parts.push('+' + latest.newPosts + ' new');
-      if (latest.postsMerged > 0) parts.push(latest.postsMerged + ' merged');
-      statsEl.textContent = parts.join(' · ');
-    }
-
     const graphEl = $('#syncGraph');
     if (graphEl) graphEl.innerHTML = buildMergeGraph(hist);
-
   } catch(e) {
     console.warn('syncSheet render failed:', e);
   }
-
   sheet.hidden = false;
   sheet.style.display = 'flex';
   sheet.style.opacity = '1';
