@@ -1090,6 +1090,185 @@ if ($('#geoChange')) {
   };
 }
 
+/* ---------- MAP PICKER ---------- */
+const MAP_TILES = {
+  voyager: {
+    url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+    attribution: '© <a href="https://www.openstreetmap.org/copyright">OSM</a> © <a href="https://carto.com/attributions">CARTO</a>'
+  },
+  light: {
+    url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+    attribution: '© <a href="https://www.openstreetmap.org/copyright">OSM</a> © <a href="https://carto.com/attributions">CARTO</a>'
+  },
+  dark: {
+    url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+    attribution: '© <a href="https://www.openstreetmap.org/copyright">OSM</a> © <a href="https://carto.com/attributions">CARTO</a>'
+  }
+};
+
+let mapInstance = null;
+let mapTileLayer = null;
+let mapMarker = null;
+let mapPickedLat = null;
+let mapPickedLng = null;
+let mapPickedPlace = null;
+let mapCurrentStyle = store.getItem('water.io.mapStyle') || 'voyager';
+
+const PIN_ICON = () => L.divIcon({
+  className: '',
+  html: `<svg width="28" height="36" viewBox="0 0 28 36" xmlns="http://www.w3.org/2000/svg">
+    <path d="M14 0C6.27 0 0 6.27 0 14c0 9.625 14 22 14 22S28 23.625 28 14C28 6.27 21.73 0 14 0z" fill="#ff7322"/>
+    <circle cx="14" cy="14" r="6" fill="#fff"/>
+  </svg>`,
+  iconSize: [28, 36],
+  iconAnchor: [14, 36],
+});
+
+async function reverseGeocode(lat, lng) {
+  try {
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=16`,
+      { headers: { 'Accept-Language': 'en' } }
+    );
+    const data = await res.json();
+    if (!data || !data.display_name) return null;
+    const a = data.address || {};
+    const parts = [
+      a.leisure || a.amenity || a.natural || a.neighbourhood || a.suburb || a.village || a.town,
+      a.city || a.municipality || a.county
+    ].filter(Boolean);
+    return parts.length ? parts.join(', ') : data.display_name.split(',').slice(0, 2).join(',').trim();
+  } catch(e) { return null; }
+}
+
+function setMapStyle(style) {
+  if (!MAP_TILES[style]) return;
+  mapCurrentStyle = style;
+  store.setItem('water.io.mapStyle', style);
+  document.querySelectorAll('.map-style-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.style === style);
+  });
+  if (!mapInstance) return;
+  if (mapTileLayer) mapInstance.removeLayer(mapTileLayer);
+  const t = MAP_TILES[style];
+  mapTileLayer = L.tileLayer(t.url, { attribution: t.attribution, maxZoom: 19 });
+  mapTileLayer.addTo(mapInstance);
+}
+
+function openMapPicker() {
+  const sheet = $('#mapSheet');
+  if (!sheet) return;
+
+  // Reset
+  mapPickedLat = null; mapPickedLng = null; mapPickedPlace = null;
+  const preview = $('#mapPlacePreview');
+  const confirmBtn = $('#mapConfirm');
+  if (preview) preview.hidden = true;
+  if (confirmBtn) confirmBtn.disabled = true;
+
+  // Hide the post sheet behind the map while picker is open
+  const postSheet = $('#postSheet');
+  if (postSheet) { postSheet.style.opacity = '0'; postSheet.style.pointerEvents = 'none'; }
+
+  sheet.hidden = false;
+  setTimeout(() => sheet.classList.add('visible'), 10);
+
+  setTimeout(() => {
+    const container = $('#mapContainer');
+    if (!container) return;
+
+    if (mapInstance) { mapInstance.remove(); mapInstance = null; mapTileLayer = null; mapMarker = null; }
+
+    // Start at draft coords, else Helsinki — we'll fly to geolocation below
+    const startLat = draft.lat ?? 60.1699;
+    const startLng = draft.lng ?? 24.9384;
+    const startZoom = draft.lat != null ? 15 : 11;
+
+    mapInstance = L.map(container, { zoomControl: true, attributionControl: true })
+      .setView([startLat, startLng], startZoom);
+
+    setMapStyle(mapCurrentStyle);
+
+    // Drop existing marker if draft has coords
+    if (draft.lat != null) {
+      mapMarker = L.marker([draft.lat, draft.lng], { icon: PIN_ICON() }).addTo(mapInstance);
+      mapPickedLat = draft.lat; mapPickedLng = draft.lng;
+      if (confirmBtn) confirmBtn.disabled = false;
+    }
+
+    // Try to center on user's real location
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(pos => {
+        if (!mapInstance) return;
+        // Only fly if we don't already have a draft pin placed
+        if (draft.lat == null) {
+          mapInstance.flyTo([pos.coords.latitude, pos.coords.longitude], 14, { duration: 1 });
+        }
+      }, () => {}, { enableHighAccuracy: false, timeout: 5000, maximumAge: 120000 });
+    }
+
+    mapInstance.on('click', async (e) => {
+      const { lat, lng } = e.latlng;
+      mapPickedLat = +lat.toFixed(6);
+      mapPickedLng = +lng.toFixed(6);
+      mapPickedPlace = null;
+
+      if (mapMarker) mapMarker.remove();
+      mapMarker = L.marker([lat, lng], { icon: PIN_ICON() }).addTo(mapInstance);
+
+      if (confirmBtn) confirmBtn.disabled = false;
+
+      const preview = $('#mapPlacePreview');
+      const nameEl = $('#mapPlaceName');
+      if (preview) preview.hidden = false;
+      if (nameEl) nameEl.textContent = `${mapPickedLat}, ${mapPickedLng} — looking up…`;
+
+      const place = await reverseGeocode(mapPickedLat, mapPickedLng);
+      mapPickedPlace = place;
+      if (nameEl) nameEl.textContent = place || `${mapPickedLat}, ${mapPickedLng}`;
+    });
+  }, 220);
+}
+
+function closeMapSheet() {
+  const sheet = $('#mapSheet');
+  if (!sheet) return;
+  sheet.classList.remove('visible');
+  setTimeout(() => { sheet.hidden = true; }, 250);
+  // Restore the post sheet
+  const postSheet = $('#postSheet');
+  if (postSheet) { postSheet.style.opacity = ''; postSheet.style.pointerEvents = ''; }
+}
+
+if ($('#mapPick')) $('#mapPick').onclick = openMapPicker;
+if ($('#mapClose')) $('#mapClose').onclick = closeMapSheet;
+
+if ($('#mapConfirm')) {
+  $('#mapConfirm').onclick = () => {
+    if (mapPickedLat == null) return;
+    draft.lat = mapPickedLat;
+    draft.lng = mapPickedLng;
+    const placeInput = $('#pPlace');
+    if (placeInput && mapPickedPlace) {
+      placeInput.value = mapPickedPlace;
+      draft.place = mapPickedPlace;
+    }
+    confirmGeo(
+      mapPickedPlace
+        ? `${mapPickedPlace} (${mapPickedLat.toFixed(4)}, ${mapPickedLng.toFixed(4)})`
+        : `${mapPickedLat.toFixed(4)}, ${mapPickedLng.toFixed(4)}`
+    );
+    validatePost();
+    closeMapSheet();
+  };
+}
+
+// Style switcher — wire up buttons and reflect saved selection
+document.querySelectorAll('.map-style-btn').forEach(btn => {
+  btn.classList.toggle('active', btn.dataset.style === mapCurrentStyle);
+  btn.onclick = () => setMapStyle(btn.dataset.style);
+});
+
 function clearPhoto() {
   draft.img = null;
   const fileInput = $('#pImg');
