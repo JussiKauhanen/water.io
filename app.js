@@ -696,6 +696,7 @@ function openThread(id) {
   if (!p) return;
   openPostId = id;
   markRead(p);
+  importedIds.delete(id);
   renderThread();
 
   const tv  = $('#threadView');
