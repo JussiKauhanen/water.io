@@ -146,6 +146,8 @@ function mergeStates(sharedData) {
     if (sharedData._timestamp) {
       store.setItem(SYNC_KEY, String(sharedData._timestamp));
     }
+    // Mark all incoming posts as imported so the banner + NEW tags show
+    (sharedData.posts || []).forEach(p => { if (p && p.id) importedIds.add(p.id); });
     // Don't carry the sharer's username over — recipient starts with no username
     return { ...sharedData, user: null };
   }
@@ -703,10 +705,13 @@ function openThread(id) {
   if (fab) fab.style.display = 'none';
   if (sb)  sb.style.display = 'none';
 
+  // Push a history entry so the back gesture closes the thread
+  window.history.pushState({ waterThread: id }, '');
+
   setTimeout(() => { const b = $('#threadBody'); if (b) b.scrollTop = b.scrollHeight; }, 60);
 }
 
-function closeThread() {
+function closeThread(fromPopstate) {
   const tv  = $('#threadView');
   const fab = $('#btnNew');
   if (tv)  { tv.classList.remove('thread-open'); setTimeout(() => { tv.hidden = true; }, 300); }
@@ -714,7 +719,10 @@ function closeThread() {
   const sb  = $('#searchBar');
   if (sb)  sb.style.display = '';
   openPostId = null;
-  renderList();  // refresh list to reflect updated unread counts
+  // If closed by the back button/gesture the history entry is already gone;
+  // if closed by the in-app back arrow we need to pop it ourselves.
+  if (!fromPopstate) window.history.back();
+  renderList();
 }
 
 function renderThread() {
@@ -860,7 +868,12 @@ if (threadComposer) {
   };
 }
 
-if ($('#threadBack')) $('#threadBack').onclick = closeThread;
+if ($('#threadBack')) $('#threadBack').onclick = () => closeThread(false);
+
+// Back gesture / hardware back button closes the thread
+window.addEventListener('popstate', (e) => {
+  if (openPostId) closeThread(true);
+});
 
 /* ---------- search ---------- */
 if ($('#searchInput')) {
