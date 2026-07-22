@@ -287,16 +287,7 @@ button.ghost{background:none;border:0;color:var(--mut);padding:10px 12px;cursor:
   }
 }
 
-/* Keyboard-safe layout via dvh (dynamic viewport height).
-   dvh shrinks automatically when the on-screen keyboard appears — no JS or
-   UA sniffing needed. Supported Chrome 108+ / Safari 15.4+ (i.e. everywhere in 2026).
-   On desktop the @media guard keeps these rules away from the phone mockup. */
-@media (max-width:759px) {
-  .thread-view { bottom: auto; height: 100dvh; }
-  .sheet-wrap  { bottom: auto; height: 100dvh; }
-  .sheet       { max-height: 85dvh; }
-}
-
+/* ---- Bottom Sheets ---- */
 .sheet-wrap{
   position:fixed;inset:0;z-index:10;background:rgba(12,6,60,0.5);
   display:flex;align-items:flex-end;justify-content:center;
