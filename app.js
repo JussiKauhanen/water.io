@@ -283,41 +283,66 @@ function mergeStates(sharedData) {
 }
 
 /* ---------- URL sharing ---------- */
-function shareState() {
+
+// DEFLATE-raw + base64url helpers (~67% smaller than plain encodeURIComponent)
+function toB64url(bytes) {
+  let bin = '';
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+}
+async function deflateB64url(str) {
+  const bytes = new TextEncoder().encode(str);
+  const cs = new CompressionStream('deflate-raw');
+  const w = cs.writable.getWriter(); w.write(bytes); w.close();
+  const chunks = []; const reader = cs.readable.getReader();
+  while (true) { const { done, value } = await reader.read(); if (done) break; chunks.push(value); }
+  const out = new Uint8Array(chunks.reduce((a, c) => a + c.length, 0));
+  let pos = 0; for (const c of chunks) { out.set(c, pos); pos += c.length; }
+  return toB64url(out);
+}
+async function inflateB64urlClean(b64) {
+  const bin = atob(b64.replace(/-/g, '+').replace(/_/g, '/'));
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  const ds = new DecompressionStream('deflate-raw');
+  const writer = ds.writable.getWriter(); writer.write(bytes); writer.close();
+  const chunks = []; const reader = ds.readable.getReader();
+  while (true) { const { done, value } = await reader.read(); if (done) break; chunks.push(value); }
+  const total = chunks.reduce((n, c) => n + c.length, 0);
+  const out = new Uint8Array(total); let pos = 0;
+  for (const c of chunks) { out.set(c, pos); pos += c.length; }
+  return new TextDecoder().decode(out);
+}
+
+async function shareState() {
   try {
     if (!db || !db.posts) return null;
-    
+
     const cleanData = {
       user: db.user || null,
       _deleted: db._deleted || [],
       posts: db.posts.map(p => {
         if (!p) return null;
         const isDataUrl = p.img && p.img.startsWith('data:');
-        return {
-          ...p,
-          img: isDataUrl ? storeImage(p.img) : p.img,
-          _imgData: undefined
-        };
+        return { ...p, img: isDataUrl ? storeImage(p.img) : p.img, _imgData: undefined };
       }).filter(p => p !== null),
       _timestamp: Date.now(),
       _version: '2.0'
     };
-    
+
     const json = JSON.stringify(cleanData);
+    // Use DEFLATE-raw (z: prefix). Fall back to LZString if CompressionStream unavailable.
     let compressed;
-    
-    if (window.LZString) {
+    if (typeof CompressionStream !== 'undefined') {
+      compressed = 'z:' + await deflateB64url(json);
+    } else if (window.LZString) {
       compressed = LZString.compressToEncodedURIComponent(json);
     } else {
       compressed = encodeURIComponent(json);
     }
-    
-    const url = new URL(window.location);
-    url.searchParams.set(SHARE_KEY, compressed);
-    url.searchParams.delete('img');
-    url.searchParams.delete(MERGE_KEY);
-    
-    return url.toString();
+
+    const base = window.location.origin + window.location.pathname;
+    return base + '?' + SHARE_KEY + '=' + compressed;
   } catch(e) {
     console.warn('Share failed:', e);
     return null;
@@ -329,7 +354,10 @@ function loadSharedState() {
     const params = new URLSearchParams(window.location.search);
     const data = params.get(SHARE_KEY);
     if (!data) return null;
-    
+
+    // z: prefix = DEFLATE — handled by the async phase at startup, not here
+    if (data.startsWith('z:')) return null;
+
     let json;
     // Try LZString first; fall back to plain decoding if it fails or isn't loaded
     // (sender may have been on file:// where the CDN script didn't load)
@@ -1723,11 +1751,11 @@ $('#postSave').onclick = () => {
 };
 
 /* ---------- SHARING ---------- */
-function getShareUrl() {
+async function getShareUrl() {
   return shareState();
 }
 
-function updateSharePreview() {
+async function updateSharePreview() {
   const count = $('#shareCount');
   const time = $('#shareTime');
   if (count) {
@@ -1738,31 +1766,26 @@ function updateSharePreview() {
     const ts = db._sharedTimestamp || lastModified || Date.now();
     time.textContent = 'Last updated ' + ago(ts);
   }
-  
+
   const urlInput = $('#shareUrl');
   if (urlInput) {
-    const url = getShareUrl();
+    urlInput.value = '…generating…';
+    const url = await getShareUrl();
     if (url) urlInput.value = url;
   }
 }
 
-function showShareModal() {
+async function showShareModal() {
   const modal = $('#shareModal');
   if (!modal) return;
   modal.hidden = false;
   modal.style.display = 'flex';
   modal.style.opacity = '1';
   modal.style.pointerEvents = 'auto';
-  updateSharePreview();
-  
-  setTimeout(() => {
-    const input = $('#shareUrl');
-    if (input) {
-      input.focus();
-      input.select();
-    }
-    modal.classList.add('visible');
-  }, 100);
+  modal.classList.add('visible');
+  await updateSharePreview();
+  const input = $('#shareUrl');
+  if (input) { input.focus(); input.select(); }
 }
 
 function hideShareModal() {
@@ -1796,27 +1819,18 @@ if ($('#reactionClose')) {
 
 // Copy link
 if ($('#shareCopy')) {
-  $('#shareCopy').onclick = () => {
-    const input = $('#shareUrl');
-    if (!input) return;
-    
-    input.select();
-    try {
-      document.execCommand('copy');
-      showToast('Link copied!');
-    } catch(e) {
-      navigator.clipboard?.writeText(input.value)
-        .then(() => showToast('Link copied!'))
-        .catch(() => showToast('Select and copy the link'));
-    }
+  $('#shareCopy').onclick = async () => {
+    const url = await getShareUrl();
+    if (!url) return;
+    copyLink(url);
   };
 }
 
 // Share options
 document.querySelectorAll('.share-option').forEach(btn => {
-  btn.onclick = () => {
+  btn.onclick = async () => {
     const type = btn.dataset.share;
-    const url = getShareUrl();
+    const url = await getShareUrl();
     if (!url) {
       showToast('Failed to generate share link');
       return;
@@ -1832,7 +1846,9 @@ document.querySelectorAll('.share-option').forEach(btn => {
         copyLink(url);
         break;
       case 'whatsapp':
-        shareUrl = `https://wa.me/?text=${encodeURIComponent(title + '\n' + url)}`;
+        // Send only the URL — WhatsApp generates a rich preview card from OG tags.
+        // Embedding title + URL as text makes the raw URL appear twice (as text and as hyperlink).
+        shareUrl = `https://wa.me/?text=${encodeURIComponent(url)}`;
         window.open(shareUrl, '_blank');
         break;
       case 'facebook':
@@ -2203,20 +2219,47 @@ if ($('#appVersion')) $('#appVersion').textContent = 'v' + VERSION;
 /* ---------- go ---------- */
 console.log('Initializing water.io...');
 
-// Initialize database
 initializeDB();
-console.log('DB initialized:', db);
-
-// Render the feed
 render();
 
-// Check for persistence
 if (!persists) {
   console.info('water.io: browser storage unavailable on file:// — data lasts this session only.');
 }
 
-// Check for merge opportunities
 checkForMerge();
+
+// Async phase: handle DEFLATE (z:) share URLs — runs after initial render
+(async () => {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const data = params.get(SHARE_KEY);
+    if (!data || !data.startsWith('z:')) return;
+
+    const json = await inflateB64urlClean(data.slice(2));
+    if (!json) return;
+    const parsed = JSON.parse(json);
+    if (!parsed.posts || !Array.isArray(parsed.posts)) return;
+
+    // Resolve image refs
+    parsed.posts = parsed.posts.map(p => {
+      if (!p) return null;
+      if (p.img && typeof p.img === 'string' && !p.img.startsWith('data:')) {
+        const stored = loadImage(p.img);
+        if (stored) return { ...p, img: stored };
+      }
+      return p;
+    }).filter(Boolean);
+
+    const merged = mergeStates(parsed);
+    if (merged) {
+      db = merged;
+      save();
+      render();
+    }
+  } catch(e) {
+    console.warn('DEFLATE URL load failed:', e);
+  }
+})();
 
 // Show shared indicator if needed
 if (db._shared) {

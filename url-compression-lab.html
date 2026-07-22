@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>water.io · compression lab</title>
+<script>var LZString=function(){var r=String.fromCharCode,o="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=",n="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+-$",e={};function t(r,o){if(!e[r]){e[r]={};for(var n=0;n<r.length;n++)e[r][r.charAt(n)]=n}return e[r][o]}var i={compressToBase64:function(r){if(null==r)return"";var n=i._compress(r,6,function(r){return o.charAt(r)});switch(n.length%4){default:case 0:return n;case 1:return n+"===";case 2:return n+"==";case 3:return n+"="}},decompressFromBase64:function(r){return null==r?"":""==r?null:i._decompress(r.length,32,function(n){return t(o,r.charAt(n))})},compressToUTF16:function(o){return null==o?"":i._compress(o,15,function(o){return r(o+32)})+" "},decompressFromUTF16:function(r){return null==r?"":""==r?null:i._decompress(r.length,16384,function(o){return r.charCodeAt(o)-32})},compressToUint8Array:function(r){for(var o=i.compress(r),n=new Uint8Array(2*o.length),e=0,t=o.length;e<t;e++){var s=o.charCodeAt(e);n[2*e]=s>>>8,n[2*e+1]=s%256}return n},decompressFromUint8Array:function(o){if(null==o)return i.decompress(o);for(var n=new Array(o.length/2),e=0,t=n.length;e<t;e++)n[e]=256*o[2*e]+o[2*e+1];var s=[];return n.forEach(function(o){s.push(r(o))}),i.decompress(s.join(""))},compressToEncodedURIComponent:function(r){return null==r?"":i._compress(r,6,function(r){return n.charAt(r)})},decompressFromEncodedURIComponent:function(r){return null==r?"":""==r?null:(r=r.replace(/ /g,"+"),i._decompress(r.length,32,function(o){return t(n,r.charAt(o))}))},compress:function(o){return i._compress(o,16,function(o){return r(o)})},_compress:function(r,o,n){if(null==r)return"";var e,t,i,s={},u={},a="",p="",c="",l=2,f=3,h=2,d=[],m=0,v=0;for(i=0;i<r.length;i+=1)if(a=r.charAt(i),Object.prototype.hasOwnProperty.call(s,a)||(s[a]=f++,u[a]=!0),p=c+a,Object.prototype.hasOwnProperty.call(s,p))c=p;else{if(Object.prototype.hasOwnProperty.call(u,c)){if(c.charCodeAt(0)<256){for(e=0;e<h;e++)m<<=1,v==o-1?(v=0,d.push(n(m)),m=0):v++;for(t=c.charCodeAt(0),e=0;e<8;e++)m=m<<1|1&t,v==o-1?(v=0,d.push(n(m)),m=0):v++,t>>=1}else{for(t=1,e=0;e<h;e++)m=m<<1|t,v==o-1?(v=0,d.push(n(m)),m=0):v++,t=0;for(t=c.charCodeAt(0),e=0;e<16;e++)m=m<<1|1&t,v==o-1?(v=0,d.push(n(m)),m=0):v++,t>>=1}0==--l&&(l=Math.pow(2,h),h++),delete u[c]}else for(t=s[c],e=0;e<h;e++)m=m<<1|1&t,v==o-1?(v=0,d.push(n(m)),m=0):v++,t>>=1;0==--l&&(l=Math.pow(2,h),h++),s[p]=f++,c=String(a)}if(""!==c){if(Object.prototype.hasOwnProperty.call(u,c)){if(c.charCodeAt(0)<256){for(e=0;e<h;e++)m<<=1,v==o-1?(v=0,d.push(n(m)),m=0):v++;for(t=c.charCodeAt(0),e=0;e<8;e++)m=m<<1|1&t,v==o-1?(v=0,d.push(n(m)),m=0):v++,t>>=1}else{for(t=1,e=0;e<h;e++)m=m<<1|t,v==o-1?(v=0,d.push(n(m)),m=0):v++,t=0;for(t=c.charCodeAt(0),e=0;e<16;e++)m=m<<1|1&t,v==o-1?(v=0,d.push(n(m)),m=0):v++,t>>=1}0==--l&&(l=Math.pow(2,h),h++),delete u[c]}else for(t=s[c],e=0;e<h;e++)m=m<<1|1&t,v==o-1?(v=0,d.push(n(m)),m=0):v++,t>>=1;0==--l&&(l=Math.pow(2,h),h++)}for(t=2,e=0;e<h;e++)m=m<<1|1&t,v==o-1?(v=0,d.push(n(m)),m=0):v++,t>>=1;for(;;){if(m<<=1,v==o-1){d.push(n(m));break}v++}return d.join("")},decompress:function(r){return null==r?"":""==r?null:i._decompress(r.length,32768,function(o){return r.charCodeAt(o)})},_decompress:function(o,n,e){var t,i,s,u,a,p,c,l=[],f=4,h=4,d=3,m="",v=[],g={val:e(0),position:n,index:1};for(t=0;t<3;t+=1)l[t]=t;for(s=0,a=Math.pow(2,2),p=1;p!=a;)u=g.val&g.position,g.position>>=1,0==g.position&&(g.position=n,g.val=e(g.index++)),s|=(u>0?1:0)*p,p<<=1;switch(s){case 0:for(s=0,a=Math.pow(2,8),p=1;p!=a;)u=g.val&g.position,g.position>>=1,0==g.position&&(g.position=n,g.val=e(g.index++)),s|=(u>0?1:0)*p,p<<=1;c=r(s);break;case 1:for(s=0,a=Math.pow(2,16),p=1;p!=a;)u=g.val&g.position,g.position>>=1,0==g.position&&(g.position=n,g.val=e(g.index++)),s|=(u>0?1:0)*p,p<<=1;c=r(s);break;case 2:return""}for(l[3]=c,i=c,v.push(c);;){if(g.index>o)return"";for(s=0,a=Math.pow(2,d),p=1;p!=a;)u=g.val&g.position,g.position>>=1,0==g.position&&(g.position=n,g.val=e(g.index++)),s|=(u>0?1:0)*p,p<<=1;switch(c=s){case 0:for(s=0,a=Math.pow(2,8),p=1;p!=a;)u=g.val&g.position,g.position>>=1,0==g.position&&(g.position=n,g.val=e(g.index++)),s|=(u>0?1:0)*p,p<<=1;l[h++]=r(s),c=h-1,f--;break;case 1:for(s=0,a=Math.pow(2,16),p=1;p!=a;)u=g.val&g.position,g.position>>=1,0==g.position&&(g.position=n,g.val=e(g.index++)),s|=(u>0?1:0)*p,p<<=1;l[h++]=r(s),c=h-1,f--;break;case 2:return v.join("")}if(0==f&&(f=Math.pow(2,d),d++),l[c])m=l[c];else{if(c!==h)return null;m=i+i.charAt(0)}v.push(m),l[h++]=i+m.charAt(0),i=m,0==--f&&(f=Math.pow(2,d),d++)}}};return i}();</script>
+<style>
+  :root {
+    --ink: #1d2126; --mut: #8b939d; --line: #ecedf0;
+    --orange: #ff7322; --green: #3fa66b; --red: #e63946;
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.5 var(--font); color: var(--ink); background: #f5f6f8; padding: 32px 20px; }
+  h1 { font-size: 20px; font-weight: 800; margin: 0 0 4px; }
+  .sub { color: var(--mut); font-size: 13px; margin: 0 0 24px; }
+
+  .input-area { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin-bottom: 16px; }
+  .input-area label { font-size: 12px; font-weight: 700; color: var(--mut); text-transform: uppercase; letter-spacing: .5px; display: block; margin-bottom: 8px; }
+  textarea {
+    width: 100%; min-height: 80px; border: 1px solid var(--line); border-radius: 10px;
+    padding: 10px 12px; font: 13px/1.4 monospace; resize: vertical; color: var(--ink);
+  }
+  textarea:focus { outline: 2px solid #fbe0cc; border-color: var(--orange); }
+  .note { font-size: 12px; color: var(--mut); margin-top: 8px; }
+
+  button {
+    background: var(--orange); color: #fff; border: 0; border-radius: 10px;
+    padding: 11px 24px; font: 700 14px var(--font); cursor: pointer;
+  }
+  button:hover { background: #d95a10; }
+
+  .raw-info {
+    background: #fff; border: 1px solid var(--line); border-radius: 14px;
+    padding: 14px 16px; margin-bottom: 20px; font-size: 13px; display: none;
+  }
+  .raw-info strong { color: var(--ink); }
+  .raw-info .json-preview {
+    margin-top: 8px; background: #f5f6f8; border-radius: 8px;
+    padding: 8px 10px; font: 12px/1.4 monospace; color: var(--mut);
+    white-space: pre-wrap; word-break: break-all; max-height: 80px; overflow: auto;
+  }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+
+  .card {
+    background: #fff; border: 1px solid var(--line); border-radius: 14px;
+    padding: 18px; display: flex; flex-direction: column; gap: 10px;
+  }
+  .card-header { display: flex; align-items: center; justify-content: space-between; }
+  .card-name { font-size: 14px; font-weight: 700; }
+  .badge {
+    font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 20px;
+    background: #ecedf0; color: var(--mut);
+  }
+  .badge.best { background: #d8f0e4; color: #1a6642; }
+  .badge.worst { background: #fde8ea; color: #9e1a23; }
+
+  .stats { display: flex; gap: 12px; }
+  .stat { flex: 1; }
+  .stat-val { font-size: 22px; font-weight: 800; line-height: 1; }
+  .stat-val.good { color: var(--green); }
+  .stat-val.bad  { color: var(--red); }
+  .stat-label { font-size: 11px; color: var(--mut); margin-top: 2px; }
+
+  .bar-wrap { background: #f0f1f3; border-radius: 6px; height: 6px; overflow: hidden; }
+  .bar { height: 100%; border-radius: 6px; background: var(--orange); transition: width .4s; }
+
+  .output-box {
+    background: #f5f6f8; border-radius: 8px; padding: 8px 10px;
+    font: 11px/1.4 monospace; color: var(--mut);
+    word-break: break-all; max-height: 72px; overflow: auto;
+  }
+  .url-len { font-size: 11px; color: var(--mut); }
+  .url-len span { font-weight: 700; color: var(--ink); }
+
+  .error { color: var(--red); font-size: 12px; font-style: italic; }
+</style>
+</head>
+<body>
+
+<h1>water.io · compression lab</h1>
+<p class="sub">Paste a share URL (or raw JSON) — we decode it back to raw JSON, then benchmark 5 compression methods.</p>
+
+<div class="input-area">
+  <label>Share URL or raw JSON</label>
+  <textarea id="input" placeholder="Paste your ?d=... share URL here, or paste raw JSON directly…"></textarea>
+  <p class="note">If you paste the full URL we extract & decode the <code>d=</code> param automatically.</p>
+</div>
+<button onclick="run()">Run benchmark</button>
+
+<div class="raw-info" id="rawInfo">
+  <strong>Decoded source JSON</strong> — <span id="rawLen"></span> chars
+  <div class="json-preview" id="jsonPreview"></div>
+</div>
+
+<div class="grid" id="grid"></div>
+
+<script>
+// ── helpers ──────────────────────────────────────────────────────────────────
+
+function toBase64Url(bytes) {
+  let bin = '';
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+}
+
+async function deflateRaw(str) {
+  const bytes = new TextEncoder().encode(str);
+  const cs = new CompressionStream('deflate-raw');
+  const writer = cs.writable.getWriter();
+  writer.write(bytes);
+  writer.close();
+  const chunks = [];
+  const reader = cs.readable.getReader();
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+  }
+  const out = new Uint8Array(chunks.reduce((a, c) => a + c.length, 0));
+  let pos = 0;
+  for (const c of chunks) { out.set(c, pos); pos += c.length; }
+  return toBase64Url(out);
+}
+
+async function gzip(str) {
+  const bytes = new TextEncoder().encode(str);
+  const cs = new CompressionStream('gzip');
+  const writer = cs.writable.getWriter();
+  writer.write(bytes);
+  writer.close();
+  const chunks = [];
+  const reader = cs.readable.getReader();
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+  }
+  const out = new Uint8Array(chunks.reduce((a, c) => a + c.length, 0));
+  let pos = 0;
+  for (const c of chunks) { out.set(c, pos); pos += c.length; }
+  return toBase64Url(out);
+}
+
+// ── decode input → raw JSON ───────────────────────────────────────────────────
+
+function extractJson(raw) {
+  raw = raw.trim();
+
+  // If it looks like a URL, extract d= param
+  if (raw.includes('?') || raw.startsWith('http') || raw.startsWith('file')) {
+    let search = raw.includes('?') ? raw.slice(raw.indexOf('?')) : raw;
+    // handle double-encoded URLs (file:// without CDN)
+    const match = search.match(/[?&]d=([^&\s#]*)/);
+    if (!match) throw new Error('No d= parameter found in URL');
+    let data = match[1];
+
+    // Try LZString first
+    if (window.LZString) {
+      const lz = LZString.decompressFromEncodedURIComponent(data);
+      if (lz && lz.startsWith('{')) return lz;
+    }
+    // Fall back to single decode
+    try {
+      const once = decodeURIComponent(data);
+      if (once.startsWith('{')) return once;
+      // Double-encoded
+      const twice = decodeURIComponent(once);
+      if (twice.startsWith('{')) return twice;
+    } catch {}
+    throw new Error('Could not decode URL parameter');
+  }
+
+  // Assume raw JSON
+  if (raw.startsWith('{')) return raw;
+
+  throw new Error('Input not recognised as URL or JSON');
+}
+
+// ── benchmark ─────────────────────────────────────────────────────────────────
+
+const BASE_URL = 'https://jussikauhanen.github.io/water.io/?d=';
+
+async function run() {
+  const input = document.getElementById('input').value;
+  let json;
+  try {
+    json = extractJson(input);
+    JSON.parse(json); // validate
+  } catch(e) {
+    alert('Could not decode input: ' + e.message);
+    return;
+  }
+
+  const rawInfo = document.getElementById('rawInfo');
+  document.getElementById('rawLen').textContent = json.length.toLocaleString();
+  document.getElementById('jsonPreview').textContent = json;
+  rawInfo.style.display = 'block';
+
+  const methods = [
+    {
+      name: 'Baseline',
+      desc: 'encodeURIComponent (no compression)',
+      fn: async (j) => encodeURIComponent(j),
+    },
+    {
+      name: 'LZString URI-safe',
+      desc: 'compressToEncodedURIComponent — currently used',
+      fn: async (j) => LZString.compressToEncodedURIComponent(j),
+      highlight: true,
+    },
+    {
+      name: 'LZString Base64',
+      desc: 'compressToBase64 + encodeURIComponent',
+      fn: async (j) => encodeURIComponent(LZString.compressToBase64(j)),
+    },
+    {
+      name: 'DEFLATE-raw + base64url',
+      desc: 'Browser CompressionStream (deflate-raw)',
+      fn: async (j) => await deflateRaw(j),
+    },
+    {
+      name: 'GZIP + base64url',
+      desc: 'Browser CompressionStream (gzip)',
+      fn: async (j) => await gzip(j),
+    },
+  ];
+
+  const results = [];
+  for (const m of methods) {
+    try {
+      const out = await m.fn(json);
+      results.push({ ...m, out, len: out.length, urlLen: (BASE_URL + out).length });
+    } catch(e) {
+      results.push({ ...m, out: null, len: null, error: e.message });
+    }
+  }
+
+  const baseline = results[0].len;
+  const minLen = Math.min(...results.filter(r => r.len).map(r => r.len));
+  const maxLen = Math.max(...results.filter(r => r.len).map(r => r.len));
+
+  const grid = document.getElementById('grid');
+  grid.innerHTML = '';
+
+  results.forEach(r => {
+    const ratio = r.len ? ((1 - r.len / baseline) * 100) : null;
+    const isBest = r.len === minLen;
+    const isWorst = r.len === maxLen && r.len !== minLen;
+    const barPct = r.len ? (r.len / maxLen * 100) : 0;
+
+    const card = document.createElement('div');
+    card.className = 'card';
+
+    const badgeText = isBest ? 'smallest' : isWorst ? 'largest' : '';
+    const badgeClass = isBest ? 'badge best' : isWorst ? 'badge worst' : 'badge';
+
+    card.innerHTML = `
+      <div class="card-header">
+        <span class="card-name">${r.name}${r.highlight ? ' ★' : ''}</span>
+        ${badgeText ? `<span class="${badgeClass}">${badgeText}</span>` : ''}
+      </div>
+      <div style="font-size:11px;color:var(--mut)">${r.desc}</div>
+      ${r.error ? `<div class="error">⚠ ${r.error}</div>` : `
+      <div class="stats">
+        <div class="stat">
+          <div class="stat-val ${ratio > 0 ? 'good' : ''}">${r.len.toLocaleString()}</div>
+          <div class="stat-label">param chars</div>
+        </div>
+        <div class="stat">
+          <div class="stat-val ${ratio > 0 ? 'good' : ratio < 0 ? 'bad' : ''}">${ratio !== null ? (ratio > 0 ? '−' : '+') + Math.abs(ratio).toFixed(1) + '%' : '—'}</div>
+          <div class="stat-label">vs baseline</div>
+        </div>
+        <div class="stat">
+          <div class="stat-val">${r.urlLen.toLocaleString()}</div>
+          <div class="stat-label">full URL chars</div>
+        </div>
+      </div>
+      <div class="bar-wrap"><div class="bar" style="width:${barPct}%"></div></div>
+      <div class="output-box">${r.out}</div>
+      `}
+    `;
+    grid.appendChild(card);
+  });
+}
+</script>
+</body>
+</html>
