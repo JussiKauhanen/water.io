@@ -2305,23 +2305,9 @@ window.requireUser = requireUser;
 
 console.log('water.io ready!');
 
-/* ---------- Android keyboard avoidance ----------
-   iOS natively positions fixed elements above the keyboard — no JS needed there.
-   Android Chrome keeps fixed elements relative to the layout viewport, so the
-   keyboard physically covers them. visualViewport.height tells us how much
-   space is actually visible; we push fixed elements up by the difference.
-*/
-if (/Android/i.test(navigator.userAgent) && window.visualViewport) {
-  let _kbRaf;
-  const _applyKb = () => {
-    cancelAnimationFrame(_kbRaf);
-    _kbRaf = requestAnimationFrame(() => {
-      const kb = Math.max(0, window.innerHeight - window.visualViewport.height);
-      document.documentElement.style.setProperty('--kb', kb + 'px');
-    });
-  };
-  window.visualViewport.addEventListener('resize', _applyKb);
-  window.visualViewport.addEventListener('scroll', _applyKb);
+/* Android flag — used in CSS for keyboard nudge */
+if (/Android/i.test(navigator.userAgent)) {
+  document.body.classList.add('android');
 }
 
 })();

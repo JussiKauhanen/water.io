@@ -287,15 +287,11 @@ button.ghost{background:none;border:0;color:var(--mut);padding:10px 12px;cursor:
   }
 }
 
-/* ---- Bottom Sheets ---- */
-/* Android keyboard offset — --kb set by JS only on Android, 0px everywhere else */
-.sheet-wrap,
-.thread-view {
-  --kb: 0px;
-}
+/* Android keyboard nudge — adds 40px breathing room at the bottom of
+   fixed overlays so the keyboard doesn't clip the composer / send button */
 @media (max-width:759px) {
-  .sheet-wrap  { bottom: var(--kb) !important; }
-  .thread-view { bottom: var(--kb) !important; }
+  body.android .thread-view   { padding-bottom: 40px; }
+  body.android .sheet-wrap .sheet { padding-bottom: calc(40px + var(--safe-bottom)); }
 }
 
 .sheet-wrap{
