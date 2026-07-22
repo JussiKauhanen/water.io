@@ -287,11 +287,14 @@ button.ghost{background:none;border:0;color:var(--mut);padding:10px 12px;cursor:
   }
 }
 
-/* Android keyboard nudge — adds 40px breathing room at the bottom of
-   fixed overlays so the keyboard doesn't clip the composer / send button */
+/* Keyboard-safe layout via dvh (dynamic viewport height).
+   dvh shrinks automatically when the on-screen keyboard appears — no JS or
+   UA sniffing needed. Supported Chrome 108+ / Safari 15.4+ (i.e. everywhere in 2026).
+   On desktop the @media guard keeps these rules away from the phone mockup. */
 @media (max-width:759px) {
-  body.android .thread-view   { padding-bottom: 40px; }
-  body.android .sheet-wrap .sheet { padding-bottom: calc(40px + var(--safe-bottom)); }
+  .thread-view { bottom: auto; height: 100dvh; }
+  .sheet-wrap  { bottom: auto; height: 100dvh; }
+  .sheet       { max-height: 85dvh; }
 }
 
 .sheet-wrap{

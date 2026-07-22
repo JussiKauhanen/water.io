@@ -2305,9 +2305,5 @@ window.requireUser = requireUser;
 
 console.log('water.io ready!');
 
-/* Android flag — used in CSS for keyboard nudge */
-if (/Android/i.test(navigator.userAgent)) {
-  document.body.classList.add('android');
-}
 
 })();
