@@ -569,8 +569,6 @@ function renderList() {
     me.textContent = db.user ? initials(db.user) : '?';
     me.style.background = db.user ? colorFor(db.user) : '#c9d1d9';
   }
-  const shareBtn = $('#btnShare');
-  if (shareBtn) shareBtn.style.display = db.posts && db.posts.length > 0 ? 'flex' : 'none';
   updateSyncPill();
   updateSharePreview();
   updateShareFab();
@@ -1830,10 +1828,6 @@ if ($('#syncClose')) {
   $('#syncClose').onclick = hideSyncSheet;
 }
 
-// Share buttons
-if ($('#btnShare')) {
-  $('#btnShare').onclick = showShareModal;
-}
 if ($('#shareClose')) {
   $('#shareClose').onclick = hideShareModal;
 }
