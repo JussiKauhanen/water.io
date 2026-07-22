@@ -238,6 +238,31 @@ button.ghost{background:none;border:0;color:var(--mut);padding:10px 12px;cursor:
 .row[hidden]{display:none}
 .hint{font-size:12.5px;color:var(--mut);margin:0 0 10px}
 
+/* ---- Share FAB ---- */
+.share-fab{
+  position:fixed;left:18px;bottom:24px;border-radius:50%;
+  border:0;color:#fff;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  /* springy pop on size change */
+  transition:width .4s cubic-bezier(.34,1.56,.64,1),
+             height .4s cubic-bezier(.34,1.56,.64,1),
+             opacity .3s ease,
+             background .3s ease,
+             box-shadow .3s ease;
+}
+/* delta 0: no new spots since last share — small, muted */
+.share-fab[data-delta="0"]{width:38px;height:38px;opacity:.5;background:#9ca3af;box-shadow:none}
+/* delta 1-2: growing urgency */
+.share-fab[data-delta="1"]{width:44px;height:44px;background:#3b5bfd;box-shadow:0 4px 14px rgba(59,91,253,.35)}
+.share-fab[data-delta="2"]{width:50px;height:50px;background:#3b5bfd;box-shadow:0 4px 18px rgba(59,91,253,.4)}
+/* delta 3+: full size — same as post FAB */
+.share-fab[data-delta="3"]{width:56px;height:56px;background:#3b5bfd;box-shadow:0 4px 22px rgba(59,91,253,.45)}
+.share-fab:hover{filter:brightness(1.1)}
+.share-fab:active{transform:scale(0.95)}
+@media (min-width:760px){
+  .share-fab{position:absolute}
+}
+
 /* ---- FAB ---- */
 .fab{
   position:fixed;right:18px;bottom:24px;width:56px;height:56px;border-radius:50%;

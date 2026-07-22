@@ -10,6 +10,7 @@ const LAST_MODIFIED_KEY = 'water.io.modified';
 const SYNC_KEY = 'water.io.sync';
 const MERGE_HISTORY_KEY = 'water.io.merges';
 const SEEN_KEY = 'water.io.seen';   // { [postId]: commentsSeenCount }
+const LAST_SHARE_KEY = 'water.io.lastshare'; // item count at time of last share
 const EMOJI = ['🏊', '🌊', '❄️', '🔥', '👏'];
 const COLORS = ['#ffd84d','#f78fc2','#3b5bfd','#3ed598','#b28dff','#ff8a5c','#2fd4e8','#ff5f8d'];
 const MAX_LENGTH = 50;
@@ -572,6 +573,7 @@ function renderList() {
   if (shareBtn) shareBtn.style.display = db.posts && db.posts.length > 0 ? 'flex' : 'none';
   updateSyncPill();
   updateSharePreview();
+  updateShareFab();
 
   if (!db.posts || db.posts.length === 0) {
     const empty = el('div', 'empty-state');
@@ -768,6 +770,7 @@ function openThread(id) {
   const sb  = $('#searchBar');
   if (tv)  { tv.hidden = false; requestAnimationFrame(() => tv.classList.add('thread-open')); }
   if (fab) fab.style.display = 'none';
+  const sf = $('#shareFab'); if (sf) sf.style.display = 'none';
   if (sb)  sb.style.display = 'none';
 
   // Push a history entry so the back gesture closes the thread
@@ -781,6 +784,7 @@ function closeThread(fromPopstate) {
   const fab = $('#btnNew');
   if (tv)  { tv.classList.remove('thread-open'); setTimeout(() => { tv.hidden = true; }, 300); }
   if (fab) fab.style.display = '';
+  const sf2 = $('#shareFab'); if (sf2) sf2.style.display = '';
   const sb  = $('#searchBar');
   if (sb)  sb.style.display = '';
   openPostId = null;
@@ -1750,6 +1754,26 @@ $('#postSave').onclick = () => {
   doPost();
 };
 
+/* ---------- SHARE FAB ---------- */
+function shareSignature() {
+  if (!db || !db.posts) return 0;
+  return db.posts.length + db.posts.reduce((a, p) => a + (p.comments || []).length, 0);
+}
+
+function updateShareFab() {
+  const fab = document.getElementById('shareFab');
+  if (!fab) return;
+  // First run ever: baseline to current state so the FAB starts small.
+  // It grows only as new items are added after this point.
+  if (store.getItem(LAST_SHARE_KEY) === null) {
+    store.setItem(LAST_SHARE_KEY, shareSignature());
+  }
+  const lastCount = parseInt(store.getItem(LAST_SHARE_KEY));
+  const delta = Math.max(0, shareSignature() - lastCount);
+  fab.dataset.delta = Math.min(delta, 3);
+  fab.title = delta > 0 ? `Share spots (${delta} new since last share)` : 'Share spots';
+}
+
 /* ---------- SHARING ---------- */
 async function getShareUrl() {
   return shareState();
@@ -1871,8 +1895,16 @@ document.querySelectorAll('.share-option').forEach(btn => {
         }
         break;
     }
+    // Record share baseline so the share-fab resets to minimum size
+    store.setItem(LAST_SHARE_KEY, shareSignature());
+    updateShareFab();
   };
 });
+
+// Wire up the bottom share FAB
+if ($('#shareFab')) {
+  $('#shareFab').onclick = showShareModal;
+}
 
 function copyLink(url) {
   if (navigator.clipboard && navigator.clipboard.writeText) {
