@@ -54,6 +54,7 @@ function initializeDB() {
   }
   if (!db.posts) db.posts = [];
   if (!db.user) db.user = null;
+  if (!db._deleted) db._deleted = [];
   return db;
 }
 
@@ -93,7 +94,8 @@ function save() {
     // Make sure we're saving the current state
     const dataToSave = {
       user: db.user,
-      posts: db.posts
+      posts: db.posts,
+      _deleted: db._deleted || []
     };
     
     console.log('Saving to localStorage:', dataToSave);
@@ -110,18 +112,19 @@ function save() {
 }
 
 function clean(d) {
-  if (!d || typeof d !== 'object') return { user: null, posts: [] };
-  
+  if (!d || typeof d !== 'object') return { user: null, posts: [], _deleted: [] };
+
   d.posts = (d.posts || []).filter(p => p && p.user).map(p => ({
-    ...p, 
+    ...p,
     img: p.img || null,
     reacts: p.reacts || {},
-    comments: (p.comments || []).filter(c => c && c.user).map(c => ({ 
-      ...c, 
-      reacts: c.reacts || {} 
+    comments: (p.comments || []).filter(c => c && c.user).map(c => ({
+      ...c,
+      reacts: c.reacts || {}
     }))
   }));
-  
+  if (!d._deleted) d._deleted = [];
+
   return d;
 }
 
@@ -149,14 +152,23 @@ function mergeStates(sharedData) {
     // Mark all incoming posts as imported so the banner + NEW tags show
     (sharedData.posts || []).forEach(p => { if (p && p.id) importedIds.add(p.id); });
     // Don't carry the sharer's username over — recipient starts with no username
-    return { ...sharedData, user: null };
+    return { ...sharedData, user: null, _deleted: sharedData._deleted || [] };
   }
   
   console.log('Merging shared state with existing data...');
 
+  // Merge tombstones from both sides — deleted posts stay deleted
+  const deletedSet = new Set([
+    ...(existing._deleted || []),
+    ...(sharedData._deleted || [])
+  ]);
+
   const postMap = new Map();
+  let deletedFromExisting = 0;
   existing.posts.forEach(p => {
-    if (p && p.id) postMap.set(p.id, p);
+    if (!p || !p.id) return;
+    if (deletedSet.has(p.id)) { deletedFromExisting++; return; }
+    postMap.set(p.id, p);
   });
 
   let mergedCount = 0;
@@ -166,6 +178,7 @@ function mergeStates(sharedData) {
 
   sharedData.posts.forEach(p => {
     if (!p || !p.id) return;
+    if (deletedSet.has(p.id)) return;  // respect tombstone
 
     if (postMap.has(p.id)) {
       const existingPost = postMap.get(p.id);
@@ -217,7 +230,7 @@ function mergeStates(sharedData) {
   });
 
   // Nothing actually changed — silently return existing data, no toast, no history entry
-  if (newPostsAdded === 0 && newComments === 0 && newReactions === 0) {
+  if (newPostsAdded === 0 && newComments === 0 && newReactions === 0 && deletedFromExisting === 0) {
     console.log('No actual changes in shared URL, skipping merge');
     return existing;
   }
@@ -232,6 +245,7 @@ function mergeStates(sharedData) {
   const merged = {
     user: existing.user || null,  // never override recipient's username from shared link
     posts: mergedPosts,
+    _deleted: [...deletedSet],
     _merged: true,
     _timestamp: Date.now(),
     _sharedTimestamp: sharedData._timestamp || Date.now()
@@ -247,6 +261,7 @@ function mergeStates(sharedData) {
       newPosts: newPostsAdded,
       newComments,
       newReactions,
+      deletedPosts: deletedFromExisting,
       postsMerged: mergedCount,
       totalPosts: mergedPosts.length
     };
@@ -274,6 +289,7 @@ function shareState() {
     
     const cleanData = {
       user: db.user || null,
+      _deleted: db._deleted || [],
       posts: db.posts.map(p => {
         if (!p) return null;
         const isDataUrl = p.img && p.img.startsWith('data:');
@@ -315,12 +331,15 @@ function loadSharedState() {
     if (!data) return null;
     
     let json;
+    // Try LZString first; fall back to plain decoding if it fails or isn't loaded
+    // (sender may have been on file:// where the CDN script didn't load)
     if (window.LZString) {
       json = LZString.decompressFromEncodedURIComponent(data);
-    } else {
-      json = decodeURIComponent(data);
     }
-    
+    if (!json) {
+      try { json = decodeURIComponent(data); } catch {}
+    }
+
     if (!json) return null;
     const parsed = JSON.parse(json);
     
@@ -373,6 +392,13 @@ function loadImage(id) {
 /* ---------- helpers ---------- */
 const colorFor = (name = '?') => COLORS[[...name].reduce((a, c) => a + c.charCodeAt(0), 0) % COLORS.length];
 
+function initials(name) {
+  if (!name) return '?';
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  return parts[0][0].toUpperCase();
+}
+
 function ago(ts) {
   if (!ts) return 'just now';
   const m = Math.floor((Date.now() - ts) / 60000);
@@ -388,7 +414,7 @@ function ago(ts) {
 
 function avatar(name, small) {
   name = name || 'Anon';
-  const b = el('button', 'avatar' + (small ? ' sm' : ''), name.charAt(0).toUpperCase());
+  const b = el('button', 'avatar' + (small ? ' sm' : ''), initials(name));
   b.style.background = colorFor(name);
   return b;
 }
@@ -511,7 +537,7 @@ function renderList() {
 
   const me = $('#btnMe');
   if (me) {
-    me.textContent = db.user ? db.user.charAt(0).toUpperCase() : '?';
+    me.textContent = db.user ? initials(db.user) : '?';
     me.style.background = db.user ? colorFor(db.user) : '#c9d1d9';
   }
   const shareBtn = $('#btnShare');
@@ -690,6 +716,16 @@ function card(p) {
 
 const refresh = () => { save(); render(); };
 
+/* ---------- delete post ---------- */
+function deletePost(id) {
+  db.posts = db.posts.filter(p => p.id !== id);
+  if (!db._deleted) db._deleted = [];
+  if (!db._deleted.includes(id)) db._deleted.push(id);
+  save();
+  closeThread(false);
+  showToast('Spot deleted');
+}
+
 /* ========== THREAD VIEW ========== */
 function openThread(id) {
   const p = db.posts.find(x => x.id === id);
@@ -732,7 +768,7 @@ function renderThread() {
 
   // Header
   const av = $('#threadAv');
-  if (av) { av.textContent = (p.user||'?').charAt(0).toUpperCase(); av.style.background = colorFor(p.user||'?'); }
+  if (av) { av.textContent = initials(p.user||'?'); av.style.background = colorFor(p.user||'?'); }
   const titleEl = $('#threadTitle');
   if (titleEl) titleEl.textContent = p.place || p.desc || 'Spot';
   const subEl = $('#threadSub');
@@ -817,6 +853,29 @@ function spotBody(p) {
   }
 
   c.append(reacts(p.reacts||{}, () => { save(); renderThread(); }, p));
+
+  // Trash button — only for own posts with no comments
+  if (db.user && p.user === db.user && (p.comments || []).length === 0) {
+    const cardFooter = el('div', 'card-delete-row');
+    const trashBtn = el('button', 'trash-btn');
+    trashBtn.title = 'Delete spot';
+    trashBtn.innerHTML = `<svg viewBox="0 0 20 20" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3.5 5.5h13M8 5.5V4h4v1.5M6 5.5l.8 10h6.4l.8-10"/>
+    </svg>`;
+    trashBtn.onclick = e => {
+      e.stopPropagation();
+      if (trashBtn.classList.contains('trash-confirm')) {
+        deletePost(p.id);
+      } else {
+        trashBtn.classList.add('trash-confirm');
+        trashBtn.title = 'Tap again to confirm';
+        setTimeout(() => trashBtn.classList.remove('trash-confirm'), 3000);
+      }
+    };
+    cardFooter.append(trashBtn);
+    c.append(cardFooter);
+  }
+
   return c;
 }
 
@@ -1151,16 +1210,16 @@ function requireUser(pendingFn) {
 $('#nameSave').onclick = () => {
   const input = $('#nameInput');
   if (!input) return;
-  
+
   const name = input.value.trim();
   console.log('Name input value:', name);
-  
+
   if (!name || name === '') {
     showToast('Please enter a username');
     input.focus();
     return;
   }
-  
+
   // Save the username
   db.user = name;
   console.log('User set to:', db.user);
@@ -1227,7 +1286,7 @@ $('#btnMe').onclick = () => {
   }
 };
 
-$('#nameInput').addEventListener('keydown', (e) => { 
+$('#nameInput').addEventListener('keydown', (e) => {
   if (e.key === 'Enter') {
     e.preventDefault();
     $('#nameSave').click();
@@ -1888,6 +1947,7 @@ function buildMergeGraph(hist) {
   function changeLabel(m) {
     const parts = [];
     if (m.newPosts > 0) parts.push(`${m.newPosts} post${m.newPosts > 1 ? 's' : ''} added`);
+    if (m.deletedPosts > 0) parts.push(`${m.deletedPosts} deleted`);
     if (m.newComments > 0) parts.push(`${m.newComments} comment${m.newComments > 1 ? 's' : ''} updated`);
     if (m.newReactions > 0) parts.push(`${m.newReactions} reaction${m.newReactions > 1 ? 's' : ''} updated`);
     if (parts.length === 0 && m.postsMerged > 0) parts.push(`${m.postsMerged} post${m.postsMerged > 1 ? 's' : ''} updated`);
@@ -1946,7 +2006,7 @@ function buildMergeGraph(hist) {
     // User avatar + branch label
     if (fx !== null) {
       s += `<circle cx="${fx}" cy="${y}" r="${USER_R}" fill="${col}"/>`;
-      s += `<text x="${fx}" y="${y + 4.5}" text-anchor="middle" font-size="9" font-weight="700" fill="#fff">${m.from.charAt(0).toUpperCase()}</text>`;
+      s += `<text x="${fx}" y="${y + 4.5}" text-anchor="middle" font-size="9" font-weight="700" fill="#fff">${initials(m.from)}</text>`;
 
       const lx = fx + USER_R + 7;
       const lbl = changeLabel(m);
@@ -1962,7 +2022,7 @@ function buildMergeGraph(hist) {
 
   // "You · now" at top
   const meCol = db.user ? colorFor(db.user) : '#8b939d';
-  const meInit = (db.user || '?').charAt(0).toUpperCase();
+  const meInit = initials(db.user || '?');
   s += `<circle cx="${MAIN_X}" cy="${youY}" r="${USER_R}" fill="${meCol}"/>`;
   s += `<text x="${MAIN_X}" y="${youY + 4.5}" text-anchor="middle" font-size="9" font-weight="700" fill="#fff">${meInit}</text>`;
   s += `<text x="${MAIN_X + USER_R + 7}" y="${youY - 1}" font-size="10" font-weight="600" fill="${meCol}">${db.user || 'You'}</text>`;

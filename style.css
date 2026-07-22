@@ -78,6 +78,11 @@ body{
     overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
   }
   .lp-qr-url:hover{color:var(--orange);}
+  .lp-feedback{
+    margin:0;font-size:11.5px;color:var(--mut);line-height:1.5;
+  }
+  .lp-feedback a{color:var(--mut);text-decoration:underline;text-underline-offset:2px;}
+  .lp-feedback a:hover{color:var(--orange);}
 
   /* ---- Right: phone mockup ---- */
   .landing-right{
@@ -116,8 +121,9 @@ body{
 .avatar{
   width:30px;height:30px;border-radius:50%;border:0;cursor:pointer;
   color:#1d2126;font-weight:700;font-size:13px;display:grid;place-items:center;
+  letter-spacing:-.5px;
 }
-.avatar.sm{width:28px;height:28px;font-size:12px;cursor:default}
+.avatar.sm{width:28px;height:28px;font-size:12px;cursor:default;letter-spacing:-.5px;}
 
 /* ---- feed ---- */
 .feed{flex:1;overflow-y:auto;padding:12px 12px 100px;background:#fbfbfc}
@@ -756,6 +762,24 @@ button.ghost{background:none;border:0;color:var(--mut);padding:10px 12px;cursor:
   scrollbar-width: none;
 }
 .thread-body::-webkit-scrollbar { display: none; }
+
+/* ---- Delete button ---- */
+.card-delete-row {
+  display: flex; justify-content: flex-end;
+  padding: 2px 0 0;
+}
+.trash-btn {
+  background: none; border: 0; cursor: pointer;
+  color: var(--mut); padding: 5px 2px;
+  border-radius: 7px;
+  display: flex; align-items: center; gap: 5px;
+  font-size: 11px; transition: color .15s;
+}
+.trash-btn:hover { color: #e63946; }
+.trash-btn.trash-confirm {
+  color: #e63946; font-weight: 600;
+}
+.trash-btn.trash-confirm::after { content: 'Tap again to delete'; }
 
 /* Bottom composer */
 .thread-composer {
