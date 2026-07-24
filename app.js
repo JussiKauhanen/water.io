@@ -19,6 +19,33 @@ const VERSION = '1.0';
 const $ = s => document.querySelector(s);
 const el = (t, c, x) => { const n = document.createElement(t); if (c) n.className = c; if (x != null) n.textContent = x; return n; };
 
+/* Keep fixed mobile UI inside the part of the page that remains visible when
+   Android Chrome/WebView overlays the software keyboard. */
+let viewportFrame = 0;
+function syncVisualViewport() {
+  cancelAnimationFrame(viewportFrame);
+  viewportFrame = requestAnimationFrame(() => {
+    const viewport = window.visualViewport;
+    const height = viewport ? viewport.height : window.innerHeight;
+    const top = viewport ? viewport.offsetTop : 0;
+    document.documentElement.style.setProperty('--viewport-height', `${Math.round(height)}px`);
+    document.documentElement.style.setProperty('--viewport-top', `${Math.round(top)}px`);
+
+    if (document.activeElement && document.activeElement.id === 'threadInput') {
+      const body = $('#threadBody');
+      if (body) body.scrollTop = body.scrollHeight;
+    }
+  });
+}
+
+syncVisualViewport();
+window.addEventListener('resize', syncVisualViewport, { passive: true });
+window.addEventListener('orientationchange', syncVisualViewport, { passive: true });
+if (window.visualViewport) {
+  window.visualViewport.addEventListener('resize', syncVisualViewport, { passive: true });
+  window.visualViewport.addEventListener('scroll', syncVisualViewport, { passive: true });
+}
+
 /* ---------- storage ---------- */
 const store = (() => {
   try { localStorage.setItem('__t', '1'); localStorage.removeItem('__t'); return localStorage; }

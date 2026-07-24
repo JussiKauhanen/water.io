@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover,interactive-widget=resizes-content">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,interactive-widget=resizes-content">
 <title>water.io — open water swimming spots</title>
 <meta name="description" content="Discover and share open water swimming spots with friends. No app needed.">
 <!-- Open Graph / WhatsApp / iMessage -->
@@ -100,7 +100,7 @@
       <div class="thread-body" id="threadBody"></div>
       <form class="thread-composer" id="threadComposer">
         <div class="cm-input-wrap" style="flex:1">
-          <input id="threadInput" maxlength="50" placeholder="Reply…" autocomplete="off">
+          <input id="threadInput" maxlength="50" placeholder="Reply…" autocomplete="off" enterkeyhint="send">
           <span class="cm-counter" id="threadCount">0/50</span>
         </div>
         <button type="submit" class="send" aria-label="Send reply">
@@ -120,7 +120,11 @@
         <path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/>
       </svg>
     </button>
-    <button class="fab" id="btnNew" aria-label="New spot">+</button>
+    <button class="fab" id="btnNew" aria-label="New spot">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M12 5v14M5 12h14"/>
+      </svg>
+    </button>
 
     <!-- Map Picker Overlay — inside .screen so it's clipped by the phone frame on desktop -->
     <div class="map-overlay" id="mapSheet" hidden>
@@ -354,15 +358,17 @@
       <button class="link" id="geoChange">change</button>
     </div>
 
-    <button class="primary block" id="postSave" disabled>
-      <span class="post-btn-label">Post spot</span>
-      <svg class="post-btn-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true" width="20" height="20">
-        <path d="M2 20.5c2.6.7 4.6-.3 4.6-1.9 0-1-1.2-1.5-1.9-.8-.8.8-.1 2.3 1.5 2.9 1.6.6 3.4.2 4.6-.9"
-              stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-        <path d="M21.4 2.6 9.9 13.2m11.5-10.6-6.6 18.2-3.6-7.6-7.6-3.6 17.8-7z"
-              stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" fill="currentColor" fill-opacity=".15"/>
-      </svg>
-    </button>
+    <div class="post-actions">
+      <button class="primary block" id="postSave" disabled>
+        <span class="post-btn-label">Post spot</span>
+        <svg class="post-btn-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true" width="20" height="20">
+          <path d="M2 20.5c2.6.7 4.6-.3 4.6-1.9 0-1-1.2-1.5-1.9-.8-.8.8-.1 2.3 1.5 2.9 1.6.6 3.4.2 4.6-.9"
+                stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          <path d="M21.4 2.6 9.9 13.2m11.5-10.6-6.6 18.2-3.6-7.6-7.6-3.6 17.8-7z"
+                stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" fill="currentColor" fill-opacity=".15"/>
+        </svg>
+      </button>
+    </div>
   </div>
 </div>
 
@@ -382,18 +388,6 @@
 <input type="file" id="fileImport" accept="application/json" hidden>
 <script src="app.js"></script>
 <script>
-/* Prevent iOS auto-zoom on input focus — belt-and-suspenders beyond the viewport meta */
-(function(){
-  var vp = document.querySelector('meta[name=viewport]');
-  var base = 'width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover';
-  if (vp) vp.content = base;
-  document.addEventListener('blur', function(e) {
-    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
-      if (vp) { vp.content = base; setTimeout(function(){ vp.content = base; }, 100); }
-    }
-  }, true);
-})();
-
 /* Show landing left on desktop only */
 (function(){
   var lp = document.querySelector('.landing-left');

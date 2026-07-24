@@ -6,6 +6,11 @@
   --radius:16px;
   --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
   --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --viewport-height: 100vh;
+  --viewport-top: 0px;
+}
+@supports (height:100dvh){
+  :root{--viewport-height:100dvh}
 }
 *{box-sizing:border-box}
 html,body{height:100%}
@@ -230,6 +235,16 @@ button.primary.block{width:100%;margin-top:14px;padding:13px}
 }
 #postSave.fill-full:hover .post-btn-label { opacity: 0; }
 #postSave.fill-full:hover .post-btn-icon  { opacity: 1; }
+.post-actions{
+  position:sticky;
+  z-index:2;
+  bottom:0;
+  margin-top:4px;
+  padding:10px 0 calc(20px + var(--safe-bottom));
+  background:#fff;
+}
+#postSheet .sheet{padding-bottom:0}
+.post-actions #postSave{margin-top:0}
 button.ghost{background:none;border:0;color:var(--mut);padding:10px 12px;cursor:pointer;font:14px var(--font)}
 .link{background:none;border:0;color:var(--orange);font:600 12px var(--font);cursor:pointer;padding:0;text-decoration:underline}
 
@@ -240,7 +255,7 @@ button.ghost{background:none;border:0;color:var(--mut);padding:10px 12px;cursor:
 
 /* ---- Share FAB ---- */
 .share-fab{
-  position:fixed;left:18px;bottom:24px;border-radius:50%;
+  position:fixed;left:18px;bottom:calc(24px + var(--safe-bottom));border-radius:50%;
   border:0;color:#fff;cursor:pointer;
   display:flex;align-items:center;justify-content:center;
   /* springy pop on size change */
@@ -265,11 +280,16 @@ button.ghost{background:none;border:0;color:var(--mut);padding:10px 12px;cursor:
 
 /* ---- FAB ---- */
 .fab{
-  position:fixed;right:18px;bottom:24px;width:56px;height:56px;border-radius:50%;
-  border:0;background:var(--orange);color:#fff;font-size:30px;
-  /* flex centering is more reliable than grid in Safari for button text */
+  position:fixed;right:18px;bottom:calc(24px + var(--safe-bottom));width:56px;height:56px;border-radius:50%;
+  border:0;background:var(--orange);color:#fff;padding:0;
+  -webkit-appearance:none;appearance:none;
   display:flex;align-items:center;justify-content:center;line-height:1;
-  cursor:pointer;
+  cursor:pointer;touch-action:manipulation;
+}
+.fab svg{
+  display:block;width:28px;height:28px;overflow:visible;
+  fill:none;stroke:currentColor;stroke-width:2.4;
+  stroke-linecap:round;
 }
 @media (min-width:760px){
   /* On desktop the FAB must sit inside the phone mockup (.screen has overflow:hidden) */
@@ -277,15 +297,6 @@ button.ghost{background:none;border:0;color:var(--mut);padding:10px 12px;cursor:
 }
 .fab:hover{background:var(--orange-d)}
 .fab:active{transform:scale(0.95)}
-
-@media not all and (min-resolution: 0.001dpcm) {
-  @supports (-webkit-appearance: none) {
-    .fab {
-      /* Safari fixes here */
-      padding-top: 4px;    /* moves + up */
-    }
-  }
-}
 
 /* ---- Bottom Sheets ---- */
 .sheet-wrap{
@@ -842,3 +853,23 @@ button.ghost{background:none;border:0;color:var(--mut);padding:10px 12px;cursor:
   font-size: 20px; line-height: 1; cursor: pointer; padding: 0 2px;
 }
 .search-clear:hover { color: var(--ink); }
+
+/* Keep mobile action areas inside the visible viewport when an Android
+   on-screen keyboard overlays (rather than resizes) the layout viewport. */
+@media (max-width:759px){
+  .sheet-wrap,
+  .thread-view{
+    top:var(--viewport-top);
+    right:0;
+    bottom:auto;
+    left:0;
+    height:var(--viewport-height);
+  }
+  .sheet{
+    max-height:calc(var(--viewport-height) - 8px);
+    overscroll-behavior:contain;
+  }
+  #postSheet .sheet{
+    scroll-padding-bottom:72px;
+  }
+}
