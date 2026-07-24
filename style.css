@@ -281,15 +281,10 @@ button.ghost{background:none;border:0;color:var(--mut);padding:10px 12px;cursor:
 /* ---- FAB ---- */
 .fab{
   position:fixed;right:18px;bottom:calc(24px + var(--safe-bottom));width:56px;height:56px;border-radius:50%;
-  border:0;background:var(--orange);color:#fff;padding:0;
+  border:0;background:var(--orange);color:#fff;font-size:30px;padding:0;
   -webkit-appearance:none;appearance:none;
   display:flex;align-items:center;justify-content:center;line-height:1;
   cursor:pointer;touch-action:manipulation;
-}
-.fab svg{
-  display:block;width:28px;height:28px;overflow:visible;
-  fill:none;stroke:currentColor;stroke-width:2.4;
-  stroke-linecap:round;
 }
 @media (min-width:760px){
   /* On desktop the FAB must sit inside the phone mockup (.screen has overflow:hidden) */
@@ -297,6 +292,14 @@ button.ghost{background:none;border:0;color:var(--mut);padding:10px 12px;cursor:
 }
 .fab:hover{background:var(--orange-d)}
 .fab:active{transform:scale(0.95)}
+
+/* iOS/WebKit renders the text glyph slightly low and left inside a button.
+   Padding shifts the visual center 7px up and 4px right without affecting Android. */
+@supports (-webkit-touch-callout:none){
+  @media (hover:none) and (pointer:coarse){
+    .fab{padding:0 0 14px 8px}
+  }
+}
 
 /* ---- Bottom Sheets ---- */
 .sheet-wrap{

@@ -14,7 +14,7 @@ const LAST_SHARE_KEY = 'water.io.lastshare'; // item count at time of last share
 const EMOJI = ['🏊', '🌊', '❄️', '🔥', '👏'];
 const COLORS = ['#ffd84d','#f78fc2','#3b5bfd','#3ed598','#b28dff','#ff8a5c','#2fd4e8','#ff5f8d'];
 const MAX_LENGTH = 50;
-const VERSION = '1.0';
+const VERSION = '1.5';
 
 const $ = s => document.querySelector(s);
 const el = (t, c, x) => { const n = document.createElement(t); if (c) n.className = c; if (x != null) n.textContent = x; return n; };
