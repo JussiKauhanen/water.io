@@ -1458,9 +1458,25 @@ function confirmGeo(text) {
   if (textEl) textEl.textContent = text;
 }
 
-function useCoords(lat, lng, from) {
+async function useCoords(lat, lng, from) {
   draft.lat = lat; draft.lng = lng;
-  confirmGeo(`${lat.toFixed(4)}, ${lng.toFixed(4)} · from ${from}`);
+  draft.place = '';
+  const placeInput = $('#pPlace');
+  if (placeInput) placeInput.value = '';
+
+  confirmGeo(`Looking up place name · from ${from}…`);
+  validatePost();
+
+  const place = await reverseGeocode(lat, lng);
+  if (draft.lat !== lat || draft.lng !== lng) return;
+
+  if (place) {
+    draft.place = place;
+    if (placeInput) placeInput.value = place;
+    confirmGeo(`${place} · from ${from}`);
+  } else {
+    confirmGeo(`${lat.toFixed(4)}, ${lng.toFixed(4)} · from ${from}`);
+  }
   validatePost();
 }
 
