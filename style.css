@@ -294,10 +294,10 @@ button.ghost{background:none;border:0;color:var(--mut);padding:10px 12px;cursor:
 .fab:active{transform:scale(0.95)}
 
 /* iOS/WebKit renders the text glyph slightly low and left inside a button.
-   Padding shifts the visual center 7px up and 4px right without affecting Android. */
+   Padding shifts the visual center 1px up and 1px right without affecting Android. */
 @supports (-webkit-touch-callout:none){
   @media (hover:none) and (pointer:coarse){
-    .fab{padding:0 0 14px 8px}
+    .fab{padding:0 0 2px 2px}
   }
 }
 
@@ -344,6 +344,12 @@ button.ghost{background:none;border:0;color:var(--mut);padding:10px 12px;cursor:
 .share-url-container{display:flex;gap:6px;align-items:center}
 .share-url-container input{flex:1;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font:12px monospace;background:#fff;min-width:0}
 .share-url-container input:focus{outline:2px solid #fbe0cc;border-color:var(--orange)}
+@supports (-webkit-touch-callout:none){
+  @media (hover:none) and (pointer:coarse){
+    /* Safari zooms focused inputs whose rendered font is smaller than 16px. */
+    .share-url-container input{font-size:16px}
+  }
+}
 .copy-btn{flex:0 0 auto;width:34px;height:34px;border:1px solid var(--line);background:#fff;border-radius:8px;cursor:pointer;display:grid;place-items:center;color:var(--mut)}
 .copy-btn:hover{background:#f7f8fa;color:var(--ink)}
 
